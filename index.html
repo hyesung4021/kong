@@ -1,0 +1,601 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0E1B2C">
+<title>더스카이짐 트레이너</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+
+<!-- =====================================================================
+  ★ 설정: Supabase 프로젝트의 주소와 키를 아래 따옴표 안에 붙여넣으세요.
+     (Supabase → Project Settings → API 에서 복사)
+     비워두면 '미리보기 모드'로 예시 데이터가 보이고 저장은 안 돼요.
+====================================================================== -->
+<script>
+  window.SKYGYM_CONFIG = {
+    SUPABASE_URL: "",       // 예: https://abcdefgh.supabase.co
+    SUPABASE_ANON_KEY: ""   // 예: eyJhbGciOi... (anon public 키)
+  };
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<style>
+/* Layout: one-column phone app, bottom tabs, bottom sheets. Brand: night-sky navy + sky blue, scoreboard numerals. */
+:root{
+  --bg:#EDF2F7; --surface:#FFFFFF; --ink:#0E1B2C; --muted:#5B6878; --line:#D5DEE8;
+  --accent:#1C8BD6; --accent-ink:#FFFFFF; --accent-soft:#DCEEFA;
+  --brand:#0E1B2C; --brand-ink:#EAF4FC;
+  --ok:#1E7A52; --ok-soft:#DCEFE5; --warn:#B26B12; --warn-soft:#F8EAD3; --bad:#C2412D; --bad-soft:#F9E1DC;
+  --font-num:"Barlow Condensed","IBM Plex Sans KR",system-ui,sans-serif;
+  --font-body:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --r:14px; color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#09121D; --surface:#121E2C; --ink:#E4ECF4; --muted:#8E9CAD; --line:#223244;
+  --accent:#4BB0F0; --accent-ink:#04121E; --accent-soft:#12324A; --brand:#060D16; --brand-ink:#EAF4FC;
+  --ok:#5CC596; --ok-soft:#163226; --warn:#E5AE5C; --warn-soft:#352813; --bad:#F08A76; --bad-soft:#3A1C16; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#09121D; --surface:#121E2C; --ink:#E4ECF4; --muted:#8E9CAD; --line:#223244;
+  --accent:#4BB0F0; --accent-ink:#04121E; --accent-soft:#12324A; --brand:#060D16; --brand-ink:#EAF4FC;
+  --ok:#5CC596; --ok-soft:#163226; --warn:#E5AE5C; --warn-soft:#352813; --bad:#F08A76; --bad-soft:#3A1C16; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.5;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+.bar{background:var(--brand);color:var(--brand-ink);padding:calc(14px + env(safe-area-inset-top,0px)) 16px 14px}
+.bar .in{max-width:560px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.logo{display:flex;align-items:center;gap:10px;font-family:var(--font-num);font-size:20px;font-weight:700;letter-spacing:.12em}
+.logo svg{width:26px;height:26px}
+.bar button{color:var(--brand-ink);opacity:.85}
+.wrap{max-width:560px;margin:0 auto;padding-inline:16px;padding-block:16px 120px;display:flex;flex-direction:column;gap:18px}
+.date{font-size:13px;color:var(--muted)}
+h1{margin:0;font-size:24px;font-weight:700}
+h2{margin:0;font-size:15px;font-weight:700}
+.sec{display:flex;flex-direction:column;gap:10px}
+.sec-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--surface);border-radius:var(--r);padding:12px;display:flex;flex-direction:column;gap:2px}
+.stat b{font-family:var(--font-num);font-size:32px;line-height:1;font-weight:700;font-variant-numeric:tabular-nums}
+.stat span{font-size:12px;color:var(--muted)}
+.list{display:flex;flex-direction:column;background:var(--surface);border-radius:var(--r);overflow:hidden}
+.row{display:flex;align-items:center;gap:12px;padding:14px;border-bottom:1px solid var(--line);min-width:0}
+.row:last-child{border-bottom:0}
+.row.tap{cursor:pointer}
+.row.tap:active{background:var(--bg)}
+.time{font-family:var(--font-num);font-size:22px;font-weight:600;width:56px;flex:none;font-variant-numeric:tabular-nums}
+.grow{flex:1;min-width:0}
+.name{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sub{font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.left{font-family:var(--font-num);font-weight:700;font-size:24px;line-height:1;text-align:right;font-variant-numeric:tabular-nums}
+.left small{font-size:14px;color:var(--muted);font-weight:600}
+.meter{height:4px;border-radius:2px;background:var(--line);margin-top:6px;overflow:hidden}
+.meter i{display:block;height:100%;background:var(--accent)}
+.pill{font-size:12px;font-weight:600;padding:3px 8px;border-radius:999px;white-space:nowrap}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.hot{background:var(--accent-soft);color:var(--accent)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 14px;border-radius:10px;font-weight:600;font-size:14px}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn.dark{background:var(--ink);color:var(--bg)}
+.btn.ghost{background:var(--bg);color:var(--ink)}
+.btn.danger{background:var(--bad-soft);color:var(--bad)}
+.btn.small{padding:6px 10px;font-size:13px}
+.btn.block{width:100%;padding:14px}
+.btn:disabled{opacity:.45;cursor:default}
+.link{color:var(--accent);font-weight:600;font-size:14px}
+.empty{background:var(--surface);border-radius:var(--r);padding:22px 16px;text-align:center;color:var(--muted);font-size:14px;display:flex;flex-direction:column;gap:10px;align-items:center}
+.days{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+.days::-webkit-scrollbar{display:none}
+.day{flex:none;width:52px;padding:8px 0;border-radius:12px;background:var(--surface);display:flex;flex-direction:column;align-items:center;gap:2px}
+.day span{font-size:12px;color:var(--muted)}
+.day b{font-family:var(--font-num);font-size:22px;line-height:1}
+.day i{width:5px;height:5px;border-radius:50%;background:transparent}
+.day.has i{background:var(--accent)}
+.day.on{background:var(--ink);color:var(--bg)}
+.day.on span{color:var(--bg);opacity:.75}
+.search{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{padding:7px 12px;border-radius:999px;background:var(--surface);font-size:13px;font-weight:600}
+.sheet .chip{background:var(--bg)}
+.chip.on{background:var(--ink);color:var(--bg)}
+nav.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px);z-index:5}
+nav.tabs .in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr)}
+nav.tabs button{padding:10px 0 12px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:12px;color:var(--muted)}
+nav.tabs button svg{width:22px;height:22px}
+nav.tabs button[aria-current="page"]{color:var(--accent);font-weight:600}
+.fab{position:fixed;right:16px;bottom:calc(76px + env(safe-area-inset-bottom,0px));width:56px;height:56px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;box-shadow:0 6px 18px rgba(0,0,0,.2);z-index:6}
+.fab svg{width:26px;height:26px}
+.scrim{position:fixed;inset:0;background:rgba(5,12,20,.5);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--surface);width:100%;max-width:560px;max-height:88vh;overflow-y:auto;border-radius:20px 20px 0 0;padding:20px 16px calc(20px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px}
+.sheet-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.sheet-head h3{margin:0;font-size:18px;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:13px;color:var(--muted);font-weight:500}
+.field input,.field select,.field textarea{padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;width:100%;min-width:0}
+.field textarea{min-height:84px;resize:vertical}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.big{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+.big b{font-family:var(--font-num);font-size:52px;line-height:1;font-variant-numeric:tabular-nums}
+.big span{color:var(--muted);font-weight:600}
+.kv{display:flex;flex-direction:column;gap:6px;font-size:14px;margin:0}
+.kv div{display:flex;justify-content:space-between;gap:12px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;text-align:right}
+.hist{display:flex;flex-direction:column;gap:8px}
+.hist .h{background:var(--bg);border-radius:10px;padding:10px 12px;font-size:14px;white-space:pre-wrap}
+.hist .h .d{font-size:12px;color:var(--muted)}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.confirm{background:var(--warn-soft);color:var(--ink);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px;font-size:14px}
+.note{font-size:12px;color:var(--muted);text-align:center;margin:0}
+.banner{background:var(--accent-soft);color:var(--ink);border-radius:12px;padding:10px 12px;font-size:13px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(90px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px;z-index:30;max-width:calc(100% - 32px)}
+/* login */
+.auth{min-height:100vh;display:flex;flex-direction:column;background:var(--brand);color:var(--brand-ink)}
+.auth .hero{padding:calc(56px + env(safe-area-inset-top,0px)) 24px 32px;max-width:440px;margin:0 auto;width:100%}
+.auth .hero .logo{font-size:28px}
+.auth .hero .logo svg{width:36px;height:36px}
+.auth .hero p{margin:10px 0 0;opacity:.75;font-size:14px}
+.auth .card{background:var(--surface);color:var(--ink);border-radius:24px 24px 0 0;flex:1;padding:24px 20px calc(24px + env(safe-area-inset-bottom,0px))}
+.auth form{max-width:400px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.err{color:var(--bad);font-size:13px;min-height:1em;margin:0}
+@media (prefers-reduced-motion:no-preference){.sheet{animation:up .22s ease-out}@keyframes up{from{transform:translateY(24px);opacity:.6}to{transform:none;opacity:1}}}
+</style>
+</head>
+<body>
+
+<!-- 로그인 화면 -->
+<section class="auth" id="authView" hidden>
+  <div class="hero">
+    <div class="logo"><svg viewBox="0 0 32 32" fill="none"><path d="M3 22c3-6 7-9 13-9s10 3 13 9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><circle cx="16" cy="8" r="3" fill="currentColor"/><path d="M6 27h20" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>THE SKY GYM</div>
+    <p>더스카이짐 트레이너 전용 회원·수업 관리</p>
+  </div>
+  <div class="card">
+    <form id="authForm">
+      <div class="chips" role="group" aria-label="로그인 또는 가입">
+        <button type="button" class="chip on" data-mode="login">로그인</button>
+        <button type="button" class="chip" data-mode="signup">처음이에요 (가입)</button>
+      </div>
+      <div class="field" id="nameField" hidden><label for="a_name">이름</label><input id="a_name" autocomplete="name" maxlength="20"></div>
+      <div class="field"><label for="a_email">이메일</label><input id="a_email" type="email" required autocomplete="email" inputmode="email"></div>
+      <div class="field"><label for="a_pw">비밀번호 (6자 이상)</label><input id="a_pw" type="password" required minlength="6" autocomplete="current-password"></div>
+      <p class="err" id="authErr" role="alert"></p>
+      <button class="btn primary block" type="submit" id="authBtn">로그인</button>
+      <p class="note">가입은 대표가 등록해 둔 이메일로만 사용할 수 있어요.</p>
+    </form>
+  </div>
+</section>
+
+<!-- 등록 안 된 계정 -->
+<section id="pendingView" hidden>
+  <div class="bar"><div class="in"><div class="logo">THE SKY GYM</div></div></div>
+  <div class="wrap">
+    <div class="empty">
+      <b style="color:var(--ink)">아직 등록되지 않은 계정이에요</b>
+      <span id="pendingEmail"></span>
+      대표에게 이 이메일을 트레이너로 등록해 달라고 요청한 뒤 다시 들어와 주세요.
+      <div class="actions"><button class="btn primary small" id="recheck">다시 확인</button><button class="btn ghost small" id="logout2">로그아웃</button></div>
+    </div>
+  </div>
+</section>
+
+<!-- 메인 앱 -->
+<section id="appView" hidden>
+  <div class="bar"><div class="in">
+    <div class="logo"><svg viewBox="0 0 32 32" fill="none"><path d="M3 22c3-6 7-9 13-9s10 3 13 9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><circle cx="16" cy="8" r="3" fill="currentColor"/><path d="M6 27h20" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>THE SKY GYM</div>
+    <button class="btn small" id="settingsBtn" aria-label="설정"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg></button>
+  </div></div>
+  <div class="wrap">
+    <div id="demoBanner" class="banner" hidden>미리보기 모드예요. 예시 데이터라 저장되지 않아요. 설치 안내대로 Supabase를 연결하면 실제로 저장돼요.</div>
+    <header><div class="date" id="todayLabel"></div><h1 id="pageTitle">오늘</h1></header>
+    <main id="view" class="sec"></main>
+  </div>
+  <button class="fab" id="fab" aria-label="추가"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+  <nav class="tabs"><div class="in">
+    <button data-tab="today" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>오늘</button>
+    <button data-tab="schedule"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>스케줄</button>
+    <button data-tab="members"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.3-5.5 6.5-5.5s5.7 2 6.5 5.5M16 4.8a3.5 3.5 0 0 1 0 6.4M18.5 14.8c1.6.8 2.6 2.6 3 5.2"/></svg>회원</button>
+  </div></nav>
+</section>
+
+<div id="layer"></div>
+
+<script>
+(function(){
+"use strict";
+/* ================= 유틸 ================= */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pad = n => String(n).padStart(2,"0");
+const ymd = d => d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+const WD = ["일","월","화","수","목","금","토"];
+const todayStr = () => ymd(new Date());
+const addDays = (s,n) => { const [y,m,d]=s.split("-").map(Number); return ymd(new Date(y,m-1,d+n)); };
+const dLabel = s => { const [y,m,d]=s.split("-").map(Number); return m+"월 "+d+"일 ("+WD[new Date(y,m-1,d).getDay()]+")"; };
+const store = { get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }, set(k,v){ try{ localStorage.setItem(k,v); }catch(e){} } };
+function toast(msg){ const t=document.createElement("div"); t.className="toast"; t.setAttribute("role","status"); t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2400); }
+function show(id){ ["authView","pendingView","appView"].forEach(v => $("#"+v).hidden = v!==id); }
+
+/* ================= 상태 ================= */
+const S = { members:{}, lessons:{}, trainers:{} };
+let me = null;            // 내 트레이너 정보 {id,email,name,role}
+let tab = store.get("sg_tab") || "today", selDay = todayStr(), query = "", scope = store.get("sg_scope") || "all";
+
+/* ================= 데이터 계층 ================= */
+const CFG = window.SKYGYM_CONFIG || {};
+const DEMO = !CFG.SUPABASE_URL || !CFG.SUPABASE_ANON_KEY || !window.supabase;
+const sb = DEMO ? null : window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY);
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36)+Math.random().toString(36).slice(2));
+
+async function fetchAll(table){
+  const out = []; let from = 0; const size = 1000;
+  for(;;){
+    const { data, error } = await sb.from(table).select("*").range(from, from+size-1);
+    if (error) throw error;
+    out.push(...data); if (data.length < size) break; from += size;
+  }
+  return out;
+}
+function toMap(rows){ const m = {}; rows.forEach(r => m[r.id] = r); return m; }
+
+const api = {
+  async loadAll(){
+    if (DEMO) return;
+    const [t, m, l] = await Promise.all([fetchAll("trainers"), fetchAll("members"), fetchAll("lessons")]);
+    S.trainers = toMap(t); S.members = toMap(m); S.lessons = toMap(l);
+  },
+  async save(table, row){
+    row = Object.assign({}, row); if (!row.id) row.id = uid();
+    if (!DEMO){
+      const { data, error } = await sb.from(table).upsert(row).select().single();
+      if (error) throw error; row = data;
+    }
+    S[table][row.id] = row; return row;
+  },
+  async remove(table, id){
+    if (!DEMO){ const { error } = await sb.from(table).delete().eq("id", id); if (error) throw error; }
+    delete S[table][id];
+    if (table==="members") Object.values(S.lessons).forEach(l => { if (l.member_id===id) delete S.lessons[l.id]; });
+  }
+};
+async function safe(fn, okMsg){
+  try { const r = await fn(); render(); if (okMsg) toast(okMsg); return r || true; }
+  catch(e){ console.error(e); toast(e && /JWT|auth/i.test(e.message||"") ? "로그인이 만료됐어요. 다시 로그인해 주세요." : "저장하지 못했어요. 인터넷 연결을 확인해 주세요."); return false; }
+}
+
+function seedDemo(){
+  const t = todayStr();
+  S.trainers = { t1:{id:"t1",email:"owner@theskygym.kr",name:"김대표",role:"admin"}, t2:{id:"t2",email:"coach@theskygym.kr",name:"이코치",role:"trainer"} };
+  S.members = {
+    m1:{id:"m1",name:"김민지 (예시)",phone:"010-1234-5678",goal:"체지방 감량, 하체 근력",memo:"왼쪽 무릎 통증 이력",total:20,trainer_id:"t1",created_at:addDays(t,-40)},
+    m2:{id:"m2",name:"박준호 (예시)",phone:"010-9876-5432",goal:"거북목 교정",memo:"",total:10,trainer_id:"t1",created_at:addDays(t,-22)},
+    m3:{id:"m3",name:"최유나 (예시)",phone:"010-5555-1212",goal:"웨딩 촬영 대비",memo:"평일 오전 선호",total:30,trainer_id:"t2",created_at:addDays(t,-10)}
+  };
+  const L = [["l1","m2",-7,"19:00","done","랫풀다운 30kg 4x12, 페이스풀"],["l2","m2",-4,"19:00","done","시티드 로우, 밴드 스트레칭"],["l3","m1",-2,"20:00","done","고블릿 스쿼트 16kg 4x10"],
+    ["l4","m1",0,"20:00","booked",""],["l5","m3",0,"10:00","booked",""],["l6","m2",2,"19:00","booked",""],
+    ...Array.from({length:7},(_,i)=>["d"+i,"m2",-30+i*3,"19:00","done","상체 루틴"])];
+  S.lessons = {}; L.forEach(([id,mid,off,time,status,note]) => S.lessons[id] = {id,member_id:mid,date:addDays(t,off),time,status,note});
+  me = S.trainers.t1;
+}
+
+/* ================= 계산 ================= */
+const usedOf = mid => Object.values(S.lessons).filter(l => l.member_id===mid && l.status==="done").length;
+const leftOf = m => Math.max(0, (m.total||0) - usedOf(m.id));
+const visibleM = m => scope!=="mine" || !me || m.trainer_id===me.id;
+const byName = (a,b) => (a.name||"").localeCompare(b.name||"","ko");
+const memberList = () => Object.values(S.members).filter(visibleM).sort(byName);
+const allMembers = () => Object.values(S.members).sort(byName);
+const lessonsOn = day => Object.values(S.lessons).filter(l => { const m=S.members[l.member_id]; return l.date===day && (!m || visibleM(m)); }).sort((a,b)=>a.time.localeCompare(b.time));
+const trainerList = () => Object.values(S.trainers).sort(byName);
+const tName = id => !id ? "담당 미지정" : (S.trainers[id] ? S.trainers[id].name + (me && id===me.id ? " (나)" : "") : "퇴사한 트레이너");
+const isAdmin = () => !!(me && me.role==="admin");
+
+/* ================= 화면 ================= */
+function lessonRow(l){
+  const m = S.members[l.member_id];
+  const st = l.status==="done" ? '<span class="pill ok">완료</span>' : '<span class="pill hot">예정</span>';
+  const sub = [scope!=="mine" && m ? tName(m.trainer_id) : "", l.note || (m && m.goal) || ""].filter(Boolean).join(" · ");
+  return `<div class="row tap" data-lesson="${esc(l.id)}"><div class="time">${esc(l.time)}</div>
+    <div class="grow"><div class="name">${esc(m?m.name:"삭제된 회원")}</div><div class="sub">${esc(sub)}</div></div>${st}</div>`;
+}
+function memberRow(m){
+  const left = leftOf(m), total = m.total||0, used = total-left;
+  const pill = left===0 ? '<span class="pill bad">재등록</span>' : left<=3 ? `<span class="pill warn">${left}회 남음</span>` : "";
+  const sub = [scope!=="mine" ? tName(m.trainer_id) : "", m.goal || "목표 미입력"].filter(Boolean).join(" · ");
+  return `<div class="row tap" data-member="${esc(m.id)}">
+    <div class="grow"><div class="name">${esc(m.name)}</div><div class="sub">${esc(sub)}</div><div class="meter"><i style="width:${total?Math.round(used/total*100):0}%"></i></div></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px"><div class="left">${left}<small>/${total}</small></div>${pill}</div></div>`;
+}
+function scopeBar(){
+  return `<div class="chips" role="group" aria-label="보기 범위">
+    <button class="chip ${scope==="mine"?"on":""}" data-scope="mine">내 회원</button>
+    <button class="chip ${scope!=="mine"?"on":""}" data-scope="all">센터 전체</button></div>`;
+}
+function viewToday(){
+  const t = todayStr(), today = lessonsOn(t), ms = memberList();
+  const weekDone = Object.values(S.lessons).filter(l => { const m=S.members[l.member_id]; return l.status==="done" && l.date>addDays(t,-7) && l.date<=t && (!m||visibleM(m)); }).length;
+  const low = ms.filter(m => leftOf(m)<=3);
+  let h = `<div class="stats"><div class="stat"><b>${today.length}</b><span>오늘 수업</span></div>
+    <div class="stat"><b>${weekDone}</b><span>최근 7일 완료</span></div><div class="stat"><b>${ms.length}</b><span>회원</span></div></div>
+    <section class="sec"><div class="sec-head"><h2>오늘 일정</h2><button class="link" data-act="newLesson">+ 수업 잡기</button></div>`;
+  h += today.length ? `<div class="list">${today.map(lessonRow).join("")}</div>` : `<div class="empty">오늘 잡힌 수업이 없어요<button class="btn dark small" data-act="newLesson">수업 잡기</button></div>`;
+  h += `</section>`;
+  if (low.length) h += `<section class="sec"><h2>재등록 챙길 회원</h2><div class="list">${low.map(memberRow).join("")}</div></section>`;
+  if (!Object.keys(S.members).length) h += `<div class="empty">아직 등록된 회원이 없어요. 첫 회원을 등록하면 남은 세션이 자동으로 계산돼요.<button class="btn primary small" data-act="newMember">회원 등록</button></div>`;
+  return h;
+}
+function viewSchedule(){
+  const t = todayStr(); let days = "";
+  for (let i=-1;i<20;i++){
+    const d = addDays(t,i), [y,m,dd] = d.split("-").map(Number);
+    days += `<button class="day ${d===selDay?"on":""} ${lessonsOn(d).length?"has":""}" data-day="${d}"><span>${i===0?"오늘":WD[new Date(y,m-1,dd).getDay()]}</span><b>${dd}</b><i></i></button>`;
+  }
+  const ls = lessonsOn(selDay);
+  return `<div class="days">${days}</div><section class="sec"><div class="sec-head"><h2>${esc(dLabel(selDay))}</h2><button class="link" data-act="newLesson">+ 수업 잡기</button></div>
+    ${ls.length ? `<div class="list">${ls.map(lessonRow).join("")}</div>` : `<div class="empty">이 날은 비어 있어요</div>`}</section>`;
+}
+function viewMembers(){
+  const q = query.trim();
+  const ms = memberList().filter(m => !q || (m.name||"").includes(q) || (m.phone||"").replace(/-/g,"").includes(q.replace(/-/g,"")));
+  let h = `<input class="search" id="q" type="search" placeholder="이름이나 전화번호로 찾기" value="${esc(query)}">`;
+  if (!Object.keys(S.members).length) return h + `<div class="empty">등록된 회원이 없어요<button class="btn primary small" data-act="newMember">회원 등록</button></div>`;
+  return h + (ms.length ? `<div class="list">${ms.map(memberRow).join("")}</div>` : `<div class="empty">찾는 회원이 없어요</div>`);
+}
+function render(){
+  if ($("#appView").hidden) return;
+  $("#demoBanner").hidden = !DEMO;
+  $("#todayLabel").textContent = dLabel(todayStr());
+  $("#pageTitle").textContent = {today:"오늘", schedule:"스케줄", members:"회원"}[tab] || "오늘";
+  document.querySelectorAll("nav.tabs button").forEach(b => b.dataset.tab===tab ? b.setAttribute("aria-current","page") : b.removeAttribute("aria-current"));
+  const v = $("#view"), hadFocus = document.activeElement && document.activeElement.id==="q";
+  v.innerHTML = scopeBar() + (tab==="schedule" ? viewSchedule() : tab==="members" ? viewMembers() : viewToday());
+  if (hadFocus){ const q=$("#q"); q.focus(); q.setSelectionRange(q.value.length,q.value.length); }
+  if (tab==="schedule"){ const on=v.querySelector(".day.on"); if (on) on.scrollIntoView({inline:"center",block:"nearest"}); }
+}
+
+/* ================= 시트(팝업) ================= */
+function openSheet(html, mount){
+  $("#layer").innerHTML = `<div class="scrim" id="scrim"><div class="sheet" role="dialog" aria-modal="true">${html}</div></div>`;
+  const sc = $("#scrim");
+  sc.addEventListener("click", e => { if (e.target===sc || e.target.closest("[data-close]")) closeSheet(); });
+  mount && mount(sc.querySelector(".sheet"));
+}
+function closeSheet(){ $("#layer").innerHTML = ""; }
+const head = t => `<div class="sheet-head"><h3>${t}</h3><button class="btn ghost small" data-close>닫기</button></div>`;
+const trainerOptions = sel => trainerList().map(t => `<option value="${esc(t.id)}" ${t.id===sel?"selected":""}>${esc(tName(t.id))}</option>`).join("") + `<option value="" ${!sel?"selected":""}>담당 미지정</option>`;
+
+function memberForm(m){
+  m = m || {};
+  openSheet(`${head(m.id?"회원 정보 수정":"회원 등록")}
+    <form id="mf" class="sec">
+      <div class="field"><label for="m_name">이름</label><input id="m_name" required maxlength="30" value="${esc(m.name)}"></div>
+      <div class="field"><label for="m_phone">전화번호</label><input id="m_phone" inputmode="tel" maxlength="20" value="${esc(m.phone)}" placeholder="010-0000-0000"></div>
+      <div class="field"><label for="m_tr">담당 트레이너</label><select id="m_tr">${trainerOptions(m.id ? m.trainer_id : me && me.id)}</select></div>
+      <div class="field"><label for="m_goal">운동 목표</label><input id="m_goal" maxlength="60" value="${esc(m.goal)}" placeholder="예: 체지방 감량, 거북목 교정"></div>
+      ${m.id ? "" : `<div class="field"><label for="m_total">등록 세션</label><div class="chips" id="pk">${[10,20,30,50].map(n=>`<button type="button" class="chip ${n===20?"on":""}" data-n="${n}">${n}회</button>`).join("")}</div>
+        <input id="m_total" type="number" min="1" max="500" value="20" inputmode="numeric"></div>`}
+      <div class="field"><label for="m_memo">메모</label><textarea id="m_memo" maxlength="500" placeholder="부상 이력, 선호 시간 등">${esc(m.memo)}</textarea></div>
+      <button class="btn primary block" type="submit">${m.id?"저장":"등록"}</button>
+    </form>`, s => {
+    const pk = s.querySelector("#pk");
+    pk && pk.addEventListener("click", e => { const c=e.target.closest(".chip"); if(!c) return; pk.querySelectorAll(".chip").forEach(x=>x.classList.toggle("on",x===c)); s.querySelector("#m_total").value=c.dataset.n; });
+    s.querySelector("#mf").addEventListener("submit", async e => {
+      e.preventDefault();
+      const name = s.querySelector("#m_name").value.trim(); if (!name) return;
+      const row = { id:m.id, name, phone:s.querySelector("#m_phone").value.trim(), goal:s.querySelector("#m_goal").value.trim(), memo:s.querySelector("#m_memo").value.trim(),
+        trainer_id: s.querySelector("#m_tr").value || null,
+        total: m.id ? (m.total||0) : Math.max(1, parseInt(s.querySelector("#m_total").value,10)||1) };
+      if (!m.id) row.created_at = todayStr();
+      const r = await safe(() => api.save("members", row), m.id ? "저장했어요" : "회원을 등록했어요");
+      if (r){ closeSheet(); if (!m.id && r.id) memberDetail(r.id); }
+    });
+  });
+}
+
+function memberDetail(id){
+  const m = S.members[id]; if (!m) return;
+  const left = leftOf(m), used = usedOf(id), t = todayStr();
+  const hist = Object.values(S.lessons).filter(l=>l.member_id===id && l.status==="done").sort((a,b)=>(b.date+b.time).localeCompare(a.date+a.time));
+  const next = Object.values(S.lessons).filter(l=>l.member_id===id && l.status==="booked" && l.date>=t).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time))[0];
+  openSheet(`${head(esc(m.name))}
+    <div class="big"><b>${left}</b><span>회 남음 · 총 ${m.total}회 중 ${used}회 진행</span></div>
+    <dl class="kv">
+      <div><dt>담당</dt><dd>${esc(tName(m.trainer_id))}</dd></div>
+      <div><dt>전화번호</dt><dd style="user-select:all">${esc(m.phone||"-")}</dd></div>
+      <div><dt>목표</dt><dd>${esc(m.goal||"-")}</dd></div>
+      <div><dt>다음 수업</dt><dd>${next?esc(dLabel(next.date)+" "+next.time):"없음"}</dd></div>
+      <div><dt>등록일</dt><dd>${esc(m.created_at||"-")}</dd></div>
+    </dl>
+    ${m.memo?`<div class="hist"><div class="h">${esc(m.memo)}</div></div>`:""}
+    <div class="actions"><button class="btn primary" data-act="book">수업 잡기</button><button class="btn ghost" data-act="renew">세션 추가</button><button class="btn ghost" data-act="edit">정보 수정</button></div>
+    <div id="renewBox"></div>
+    <h2>수업 기록 <span class="sub">(${hist.length})</span></h2>
+    <div class="hist">${hist.length ? hist.slice(0,50).map(l=>`<div class="h"><div class="d">${esc(dLabel(l.date))} ${esc(l.time)}</div>${esc(l.note||"기록 없음")}</div>`).join("") : '<div class="h sub">아직 완료한 수업이 없어요</div>'}</div>
+    <div id="delBox"><button class="btn danger small" data-act="askDel">회원 삭제</button></div>`, s => {
+    s.addEventListener("click", async e => {
+      const add = e.target.closest("[data-add]");
+      if (add){ const n=+add.dataset.add; if (await safe(() => api.save("members", Object.assign({}, m, {total:(m.total||0)+n})), n+"회 추가했어요")) memberDetail(id); return; }
+      const a = e.target.closest("[data-act]"); if (!a) return;
+      switch(a.dataset.act){
+        case "book": lessonForm(null, id); break;
+        case "edit": memberForm(m); break;
+        case "renew": s.querySelector("#renewBox").innerHTML = `<div class="confirm">추가할 세션 수를 골라 주세요<div class="chips">${[5,10,20,30].map(n=>`<button class="chip" data-add="${n}">+${n}회</button>`).join("")}</div></div>`; break;
+        case "askDel": s.querySelector("#delBox").innerHTML = `<div class="confirm">${esc(m.name)} 회원과 수업 기록을 모두 지울까요? 되돌릴 수 없어요.<div class="actions"><button class="btn danger small" data-act="doDel">삭제</button><button class="btn ghost small" data-act="noDel">취소</button></div></div>`; break;
+        case "noDel": memberDetail(id); break;
+        case "doDel": if (await safe(() => api.remove("members", id), "삭제했어요")) closeSheet(); break;
+      }
+    });
+  });
+}
+
+function lessonForm(l, presetMember){
+  const vis = memberList(), ms = vis.length ? vis : allMembers();
+  const keep = (l && l.member_id) || presetMember;
+  if (keep && !ms.some(m=>m.id===keep) && S.members[keep]) ms.unshift(S.members[keep]);
+  if (!ms.length){ toast("먼저 회원을 등록해 주세요"); memberForm(); return; }
+  l = l || {};
+  const mid = keep || ms[0].id, date = l.date || selDay || todayStr();
+  const defT = pad(Math.min(22, new Date().getHours()+1))+":00";
+  openSheet(`${head(l.id?"수업 시간 변경":"수업 잡기")}
+    <form id="lf" class="sec">
+      <div class="field"><label for="l_m">회원</label><select id="l_m">${ms.map(m=>`<option value="${esc(m.id)}" ${m.id===mid?"selected":""}>${esc(m.name)} · ${leftOf(m)}회 남음</option>`).join("")}</select></div>
+      <div class="two"><div class="field"><label for="l_d">날짜</label><input id="l_d" type="date" required value="${esc(date)}"></div>
+        <div class="field"><label for="l_t">시간</label><input id="l_t" type="time" required step="600" value="${esc(l.time||defT)}"></div></div>
+      <button class="btn primary block" type="submit">${l.id?"저장":"일정 추가"}</button>
+    </form>`, s => {
+    s.querySelector("#lf").addEventListener("submit", async e => {
+      e.preventDefault();
+      const row = { id:l.id, member_id:s.querySelector("#l_m").value, date:s.querySelector("#l_d").value, time:s.querySelector("#l_t").value, status:l.status||"booked", note:l.note||"" };
+      if (!row.date || !row.time) return;
+      if (await safe(() => api.save("lessons", row), l.id?"저장했어요":"일정을 추가했어요")){ selDay = row.date; closeSheet(); render(); }
+    });
+  });
+}
+
+function lessonDetail(lid){
+  const l = S.lessons[lid]; if (!l) return;
+  const m = S.members[l.member_id], done = l.status==="done", noLeft = m && leftOf(m)===0;
+  openSheet(`${head(esc(m?m.name:"수업"))}
+    <div class="sub" style="white-space:normal">${esc(dLabel(l.date))} ${esc(l.time)} · ${done?"완료한 수업":"예정된 수업"}${m?` · ${esc(tName(m.trainer_id))} · ${leftOf(m)}회 남음`:""}</div>
+    <div class="field"><label for="l_note">오늘 운동 기록</label><textarea id="l_note" maxlength="1000" placeholder="예: 스쿼트 40kg 5x5, 데드리프트 폼 교정. 다음엔 하체 볼륨 올리기">${esc(l.note)}</textarea></div>
+    ${done ? `<button class="btn dark block" data-act="saveNote">기록 저장</button><button class="btn ghost block" data-act="undo">완료 취소 (세션 되돌리기)</button>`
+      : `<button class="btn primary block" data-act="finish" ${noLeft?"disabled":""}>수업 완료 · 세션 1회 차감</button>
+         ${noLeft?'<p class="note">남은 세션이 없어요. 회원 화면에서 세션을 추가해 주세요.</p>':""}
+         <div class="actions"><button class="btn ghost" data-act="move">시간 변경</button><button class="btn ghost" data-act="cancel">수업 취소</button>${m?'<button class="btn ghost" data-act="member">회원 보기</button>':""}</div>`}
+    <div id="cancelBox"></div>`, s => {
+    s.addEventListener("click", async e => {
+      const a = e.target.closest("[data-act]"); if (!a) return;
+      const note = s.querySelector("#l_note").value.trim(), base = Object.assign({}, l, {note});
+      switch(a.dataset.act){
+        case "finish": if (await safe(() => api.save("lessons", Object.assign(base,{status:"done"})))){ closeSheet(); toast("수업 완료! " + (m ? leftOf(m)+"회 남았어요" : "")); } break;
+        case "saveNote": if (await safe(() => api.save("lessons", Object.assign(base,{status:"done"})), "기록을 저장했어요")) closeSheet(); break;
+        case "undo": if (await safe(() => api.save("lessons", Object.assign(base,{status:"booked"})), "완료를 취소했어요")) closeSheet(); break;
+        case "cancel": s.querySelector("#cancelBox").innerHTML = `<div class="confirm">이 수업 일정을 지울까요?<div class="actions"><button class="btn danger small" data-act="doCancel">수업 취소</button><button class="btn ghost small" data-close>그대로 두기</button></div></div>`; break;
+        case "doCancel": if (await safe(() => api.remove("lessons", lid), "수업을 취소했어요")) closeSheet(); break;
+        case "move": lessonForm(l); break;
+        case "member": memberDetail(l.member_id); break;
+      }
+    });
+  });
+}
+
+function settingsSheet(){
+  const ts = trainerList();
+  openSheet(`${head("내 계정")}
+    <dl class="kv"><div><dt>이름</dt><dd>${esc(me?me.name:"-")}</dd></div><div><dt>이메일</dt><dd>${esc(me?me.email:"-")}</dd></div><div><dt>권한</dt><dd>${isAdmin()?"대표(관리자)":"트레이너"}</dd></div></dl>
+    <h2>트레이너 ${ts.length}명</h2>
+    <div class="list" style="background:var(--bg)">${ts.map(t=>`<div class="row"><div class="grow"><div class="name">${esc(t.name)}${t.role==="admin"?' <span class="pill hot">대표</span>':""}</div><div class="sub">${esc(t.email)}</div></div>
+      ${isAdmin() && (!me || t.id!==me.id) ? `<button class="btn ghost small" data-del="${esc(t.id)}">내보내기</button>` : ""}</div>`).join("")}</div>
+    <div id="trBox"></div>
+    ${isAdmin() ? `<form id="tf" class="sec"><h2>트레이너 추가</h2>
+      <div class="two"><div class="field"><label for="t_name">이름</label><input id="t_name" required maxlength="20"></div>
+      <div class="field"><label for="t_role">권한</label><select id="t_role"><option value="trainer">트레이너</option><option value="admin">대표(관리자)</option></select></div></div>
+      <div class="field"><label for="t_email">이메일 (이 이메일로 가입하면 바로 쓸 수 있어요)</label><input id="t_email" type="email" required inputmode="email"></div>
+      <button class="btn primary block" type="submit">추가</button></form>` : ""}
+    <button class="btn ghost block" data-act="logout">로그아웃</button>`, s => {
+    s.addEventListener("click", async e => {
+      const d = e.target.closest("[data-del]");
+      if (d){ const t = S.trainers[d.dataset.del];
+        s.querySelector("#trBox").innerHTML = `<div class="confirm">${esc(t.name)} 트레이너를 내보낼까요? 더 이상 로그인해도 데이터를 볼 수 없어요. 담당 회원은 '담당 미지정'이 돼요.<div class="actions"><button class="btn danger small" data-dodel="${esc(t.id)}">내보내기</button><button class="btn ghost small" data-act="refresh">취소</button></div></div>`; return; }
+      const dd = e.target.closest("[data-dodel]");
+      if (dd){ if (await safe(() => api.remove("trainers", dd.dataset.dodel), "내보냈어요")){ Object.values(S.members).forEach(m => { if (m.trainer_id===dd.dataset.dodel) m.trainer_id=null; }); settingsSheet(); } return; }
+      const a = e.target.closest("[data-act]"); if (!a) return;
+      if (a.dataset.act==="refresh") settingsSheet();
+      if (a.dataset.act==="logout") logout();
+    });
+    const tf = s.querySelector("#tf");
+    tf && tf.addEventListener("submit", async e => {
+      e.preventDefault();
+      const email = s.querySelector("#t_email").value.trim().toLowerCase();
+      if (Object.values(S.trainers).some(t => t.email.toLowerCase()===email)){ toast("이미 등록된 이메일이에요"); return; }
+      if (await safe(() => api.save("trainers", {name:s.querySelector("#t_name").value.trim(), email, role:s.querySelector("#t_role").value}), "트레이너를 추가했어요")) settingsSheet();
+    });
+  });
+}
+
+/* ================= 이벤트 ================= */
+document.querySelector("nav.tabs").addEventListener("click", e => { const b=e.target.closest("[data-tab]"); if (!b) return; tab=b.dataset.tab; store.set("sg_tab",tab); window.scrollTo(0,0); render(); });
+$("#view").addEventListener("click", e => {
+  const sc = e.target.closest("[data-scope]"); if (sc){ scope=sc.dataset.scope; store.set("sg_scope",scope); render(); return; }
+  const d = e.target.closest("[data-day]"); if (d){ selDay=d.dataset.day; render(); return; }
+  const m = e.target.closest("[data-member]"); if (m){ memberDetail(m.dataset.member); return; }
+  const l = e.target.closest("[data-lesson]"); if (l){ lessonDetail(l.dataset.lesson); return; }
+  const a = e.target.closest("[data-act]"); if (!a) return;
+  if (a.dataset.act==="newLesson") lessonForm();
+  if (a.dataset.act==="newMember") memberForm();
+});
+$("#view").addEventListener("input", e => { if (e.target.id==="q"){ query=e.target.value; render(); } });
+$("#fab").addEventListener("click", () => tab==="members" ? memberForm() : lessonForm());
+$("#settingsBtn").addEventListener("click", settingsSheet);
+document.addEventListener("keydown", e => { if (e.key==="Escape") closeSheet(); });
+
+/* ================= 로그인 ================= */
+let mode = "login";
+$("#authForm").addEventListener("click", e => {
+  const c = e.target.closest("[data-mode]"); if (!c) return;
+  mode = c.dataset.mode;
+  document.querySelectorAll("[data-mode]").forEach(x => x.classList.toggle("on", x===c));
+  $("#nameField").hidden = mode!=="signup";
+  $("#authBtn").textContent = mode==="signup" ? "가입하기" : "로그인";
+  $("#a_pw").autocomplete = mode==="signup" ? "new-password" : "current-password";
+  $("#authErr").textContent = "";
+});
+$("#authForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const email = $("#a_email").value.trim(), password = $("#a_pw").value, btn = $("#authBtn");
+  btn.disabled = true; $("#authErr").textContent = "";
+  try {
+    const res = mode==="signup"
+      ? await sb.auth.signUp({ email, password, options:{ data:{ name:$("#a_name").value.trim() } } })
+      : await sb.auth.signInWithPassword({ email, password });
+    if (res.error) throw res.error;
+    if (mode==="signup" && !res.data.session) $("#authErr").textContent = "가입 확인 메일을 보냈어요. 메일의 링크를 누른 뒤 로그인해 주세요.";
+  } catch(err){
+    const msg = (err && err.message) || "";
+    $("#authErr").textContent = /Invalid login/i.test(msg) ? "이메일이나 비밀번호가 맞지 않아요."
+      : /already registered/i.test(msg) ? "이미 가입된 이메일이에요. 로그인해 주세요."
+      : /Email not confirmed/i.test(msg) ? "이메일 인증이 아직 안 됐어요. 받은 메일의 링크를 눌러 주세요."
+      : /Password/i.test(msg) ? "비밀번호는 6자 이상으로 해 주세요."
+      : "로그인하지 못했어요. 잠시 후 다시 해 주세요.";
+  } finally { btn.disabled = false; }
+});
+async function logout(){ closeSheet(); if (sb) await sb.auth.signOut(); else toast("미리보기 모드에서는 로그아웃이 없어요"); }
+$("#logout2").addEventListener("click", logout);
+$("#recheck").addEventListener("click", () => enter());
+
+/* ================= 시작 ================= */
+let channel = null, reloadTimer = null;
+async function enter(){
+  const { data:{ session } } = await sb.auth.getSession();
+  if (!session){ show("authView"); return; }
+  const email = (session.user.email||"").toLowerCase();
+  try { await api.loadAll(); } catch(e){ console.error(e); toast("데이터를 불러오지 못했어요. 새로고침해 주세요."); }
+  me = Object.values(S.trainers).find(t => (t.email||"").toLowerCase()===email) || null;
+  if (!me){ $("#pendingEmail").textContent = email; show("pendingView"); return; }
+  show("appView"); render();
+  if (!channel){
+    channel = sb.channel("skygym-live")
+      .on("postgres_changes", { event:"*", schema:"public" }, () => { clearTimeout(reloadTimer); reloadTimer = setTimeout(async () => { try { await api.loadAll(); render(); } catch(e){} }, 400); })
+      .subscribe();
+  }
+}
+if (DEMO){
+  seedDemo(); show("appView"); render();
+} else {
+  sb.auth.onAuthStateChange((ev) => {
+    if (ev==="SIGNED_IN" || ev==="SIGNED_OUT" || ev==="INITIAL_SESSION"){
+      if (ev==="SIGNED_OUT"){ if (channel){ sb.removeChannel(channel); channel=null; } S.members={}; S.lessons={}; S.trainers={}; me=null; show("authView"); return; }
+      setTimeout(enter, 0);
+    }
+  });
+}
+document.addEventListener("visibilitychange", async () => { if (!DEMO && !document.hidden && me){ try { await api.loadAll(); render(); } catch(e){} } });
+})();
+</script>
+</body>
+</html>
