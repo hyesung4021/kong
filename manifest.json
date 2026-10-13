@@ -1,0 +1,18 @@
+{
+  "name": "더스카이짐 트레이너",
+  "short_name": "더스카이짐",
+  "description": "더스카이짐 헬스&PT 일산본점 트레이너 운영 앱",
+  "lang": "ko",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F8FBFF",
+  "theme_color": "#CDE6FB",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
