@@ -349,8 +349,9 @@ button.anrelb b{color:var(--accent)}
 .bvpick.a b{background:var(--lime);color:#1F2B26}
 .bvpick span{font-size:13px;font-weight:600;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bvpick input[type=date]{border:1px solid var(--line);border-radius:10px;padding:6px 8px;background:var(--surface);font-size:13px;min-width:0}
-.bvstage{border-radius:16px;overflow:hidden;background:#000}
-.bvstage canvas{display:block;width:100%;height:auto;touch-action:none}
+.bvstage{position:relative;border-radius:16px;overflow:hidden;background:#000}
+.bvstage .bvvid{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;opacity:.02;pointer-events:none}
+.bvstage canvas{position:relative;z-index:1;display:block;width:100%;height:auto;touch-action:none}
 .bvctl{display:flex;align-items:center;gap:10px}
 .bvctl .btn{flex:none;min-width:92px}
 .bvctl input{flex:1;min-width:0;accent-color:#1F2B26}
@@ -388,7 +389,11 @@ button.anrelb b{color:var(--accent)}
 .lock p{margin:0;color:var(--muted);font-weight:600}
 .lock .search{text-align:center;font-family:var(--font-num);font-size:18px;letter-spacing:.06em;max-width:360px}
 .lock .btn{max-width:360px}
+.lock .lockerr{color:var(--short);font-weight:700}
 .lock small{color:var(--muted);font-size:12.5px;margin-top:6px}
+
+.installbtn{background:#C9A45C;color:#1F2B26;font-weight:800;max-width:360px;width:100%}
+.lock .installbtn{margin-top:4px}
 </style>
 </head>
 <body>
@@ -685,6 +690,7 @@ function viewHome(){
   const list = vals("members").filter(m => !q || m.name.includes(q) || (m.phone||"").replace(/-/g,"").includes(q.replace(/-/g,""))).sort((a,b) => (b.updated||"").localeCompare(a.updated||""));
   const otN = id => vals("ots").filter(o => o.memberId === id).length, logN = id => vals("logs").filter(l => l.memberId === id).length;
   return `<div class="top home"><div class="grow"><div class="sub">${esc(S.set.center)} · ${esc(S.set.trainer)}</div><h1>회원</h1></div><button class="anbtn" data-act="anat">근육 사전</button><button class="iconbtn" data-act="settings" aria-label="설정">⚙</button></div>
+    ${installBtn()}
     ${brandCard()}
     ${(() => { const d = dayItems(todayStr()); return `<button class="todaybtn" data-act="day"><div class="grow"><small>TODAY · ${esc(dLong(todayStr()))}</small><b>오늘 수업 정리 · 복사하기</b><span>수업 ${d.logs.length}명 · OT ${d.ots.length}명</span></div><i>›</i></button>`; })()}
     <input class="search" id="q" value="${esc(q)}" placeholder="이름이나 전화번호로 찾기" autocomplete="off">
@@ -1463,6 +1469,7 @@ function bavFrame(){
   if (M){
     const W = cv.width, H = cv.height, fs = W / 720;
     if (BV.playing){
+      ["a","b"].forEach(k => { const s = BV[k]; if (s && s.v.paused && !s.v.ended && (s.v.currentTime - s.start) < bavLen() - 0.05) s.v.play().catch(() => {}); });
       const pos = M.v.currentTime - M.start; BV.pos = pos;
       if (BV.a && BV.b){ const want = BV.b.start + (BV.a.v.currentTime - BV.a.start); if (Math.abs(BV.b.v.currentTime - want) > 0.12) try { BV.b.v.currentTime = want; } catch(_){} }
       if (pos >= bavLen() - 0.04 || M.v.ended){ bavPlay(false); if (BV.rec) BV.rec.stop(); }
@@ -1522,6 +1529,8 @@ function bavFrame(){
 }
 function bavMount(){
   const cv = $("#bavCv"); if (!cv) return; const M = bavMaster();
+  /* 폰 크롬은 화면에 안 보이는 영상을 멈춰 버려서, 영상을 캔버스 바로 뒤(화면 안)에 둬요 */
+  const stage = $(".bvstage"); if (stage) ["b","a"].forEach(k => { const s = BV[k]; if (s && s.v.parentNode !== stage){ s.v.className = "bvvid"; stage.insertBefore(s.v, cv); } });
   if (M){ const k = Math.min(1, 720 / M.v.videoWidth); cv.width = Math.round(M.v.videoWidth * k); cv.height = Math.round(M.v.videoHeight * k); }
   if (!BV.loop){ BV.loop = true; requestAnimationFrame(bavFrame); }
   const pt = e => { const r = cv.getBoundingClientRect(); return { x:(e.clientX - r.left) * cv.width / r.width, y:(e.clientY - r.top) * cv.height / r.height }; };
@@ -1629,12 +1638,12 @@ function viewSettings(){
     <section class="card"><div class="cardh"><b>데이터 백업</b><span class="sub">회원 ${n.m} · OT ${n.o} · 수업 ${n.l}</span></div>
       <p class="sub wrap">모든 기록은 이 폰 안에만 저장돼요. 폰을 바꾸거나 앱 데이터를 지우기 전에 백업 파일을 꼭 만들어 두세요.</p>
       <div class="row-btns"><button class="btn primary grow" data-act="backup">백업 파일 만들기</button><label class="btn grow">백업 불러오기<input type="file" accept=".json,application/json" id="restoreFile" hidden></label></div></section>
-    ${window.KONG_PREVIEW ? "" : `<section class="card"><div class="cardh"><b>사용 등록</b><span class="sub">${esc(S.set.licCode || "")}</span></div>
+    ${window.KONG_PREVIEW ? "" : `<section class="card"><div class="cardh"><b>로그인 계정</b><span class="sub">${esc((S.set.auth || {}).email || "")}</span></div>
       <p class="sub wrap">${esc(S.set.licCenter || "")}${S.set.licUntil ? ` · ${esc(dLong(S.set.licUntil))}까지` : " · 기간 제한 없음"}${S.set.licOk ? `<br>마지막 확인 ${esc(dLong(ymd(new Date(S.set.licOk))))}` : ""}</p>
-      <button class="btn small" data-act="licChange">코드 바꾸기</button></section>`}
+      <button class="btn small" data-act="logout">로그아웃</button></section>`}
     <section class="card"><div class="cardh"><b>앱으로 설치</b><span class="sub">${isApp() ? "앱으로 실행 중" : ""}</span></div>
       ${isApp() ? `<p class="sub wrap">홈 화면 아이콘으로 실행 중이에요. 인터넷이 없어도 열려요.</p>`
-        : `${installEvt ? `<button class="btn primary block" data-act="install">KONG 회원관리 앱 설치</button>` : ""}
+        : `<button class="btn primary block" data-act="install">📲 앱 설치하기</button>
       <p class="sub wrap">안드로이드: 크롬 메뉴(⋮) → '앱 설치' 또는 '홈 화면에 추가'<br>아이폰: 사파리 공유 버튼(□↑) → '홈 화면에 추가'</p>`}</section>`;
 }
 async function doBackup(){
@@ -1808,14 +1817,18 @@ document.addEventListener("click", async e => {
     case "settings": go({ name:"settings" }); break;
     case "anat": go({ name:"anat" }); break;
     case "licRetry": { x.disabled = true; x.textContent = "확인 중…"; LOCKED = !(await licenseGate()); render(); break; }
-    case "licSubmit": { const code = ($("#licCode").value || "").trim().toUpperCase(); if (!code){ toast("사용 코드를 입력해 주세요"); break; }
-      x.disabled = true; x.textContent = "확인 중…";
-      try { const j = await fetchLic(); LIC.contact = j.contact || ""; const r = checkCode(j, code);
-        if (r.ok){ await licOk(r.c, code); LOCKED = false; stack = [{ name:"home" }]; render(); toast(`${r.c.center || ""} 사용 등록됐어요`); }
-        else { S.set.licCode = code; LIC.why = r.why; LIC.until = (r.c && r.c.until) || ""; render(); } }
-      catch(_){ LIC.why = "needOffline"; render(); } break; }
-    case "licChange": { if (!x.dataset.sure){ x.dataset.sure = 1; x.textContent = "코드를 다시 입력할까요? 한 번 더 누르세요"; return; } S.set.licCode = ""; S.set.licOk = 0; await IDB.put("kv", S.set); LIC.why = "need"; LOCKED = true; render(); break; }
-    case "install": if (installEvt){ installEvt.prompt(); const r = await installEvt.userChoice.catch(() => null); installEvt = null; render(); } break;
+    case "login": { const id = ($("#lgId").value || "").trim(), pw = $("#lgPw").value || ""; if (!id || !pw){ toast("아이디와 비밀번호를 입력해 주세요"); break; }
+      x.disabled = true; x.textContent = "로그인 중…"; LIC.err = ""; S.set.lastId = id;
+      try { const j = await sbAuth("password", { email: toEmail(id), password: pw }); S.set.lastId = id; await saveSession(j);
+        const r = judge(await sbAccess(j.access_token));
+        if (r.ok){ await accessOk(r.row); LOCKED = false; stack = [{ name:"home" }]; render(); toast(`${r.row.center || ""} 로그인했어요`); }
+        else { LIC.why = r.why; LIC.until = r.until || ""; render(); } }
+      catch(e){ LIC.why = "login"; LIC.err = e.status === 400 ? "아이디 또는 비밀번호가 맞지 않아요" : "인터넷 연결을 확인해 주세요"; render(); } break; }
+    case "logout": { if (x.dataset.act === "logout" && top().name === "settings" && !x.dataset.sure){ x.dataset.sure = 1; x.textContent = "로그아웃할까요? 한 번 더 누르세요"; return; }
+      S.set.auth = null; S.set.licOk = 0; await IDB.put("kv", S.set); LIC.why = "login"; LIC.err = ""; LOCKED = true; render(); break; }
+    case "install": if (installEvt){ installEvt.prompt(); await installEvt.userChoice.catch(() => null); installEvt = null; render(); }
+      else { const ios = /iPhone|iPad|iPod/.test(navigator.userAgent); openSheet(`<h2>앱 설치하기</h2>${ios ? `<p class="wrap">1. 사파리 아래쪽 <b>공유 버튼(□↑)</b>을 눌러요<br>2. <b>'홈 화면에 추가'</b>를 눌러요<br>3. 오른쪽 위 <b>'추가'</b>를 누르면 끝이에요</p>`
+        : `<p class="wrap">1. 크롬 오른쪽 위 <b>⋮ (점 세 개)</b>를 눌러요<br>2. <b>'앱 설치'</b> 또는 <b>'홈 화면에 추가' → '설치'</b>를 눌러요<br>3. 바탕화면에 <b>K 아이콘</b>이 생기면 끝이에요</p><p class="sub wrap">설치 창이 바로 안 뜨면 10초쯤 뒤에 다시 눌러 보세요.</p>`}`); } break;
     case "cardToggle": cardOpen = !cardOpen; render(); break;
     case "cardReset": S.set.card = ""; await IDB.put("kv", S.set); render(); break;
     case "clearPhotos": { if (!x.dataset.sure){ x.dataset.sure = 1; x.textContent = "정말 지울까요? 한 번 더 누르세요"; return; }
@@ -1853,45 +1866,61 @@ document.addEventListener("click", async e => {
   }
 });
 
-/* ---------- 사용 허가 (라이선스) ---------- */
-const LIC_URL = "https://hyesung4021.github.io/kong/app/license.json";
+/* ---------- 로그인 (더스카이짐과 같은 Supabase 계정) ---------- */
+const SB_URL = "https://tkzcbsqvdxosddnuaqqd.supabase.co", SB_KEY = "sb_publishable_Zjk4iKbD5qbeAytkuc79Hw_k05_Qdjr";
 const LIC_GRACE = 7 * 864e5;   /* 인터넷이 없어도 마지막 확인 후 7일은 사용 가능 */
-let LOCKED = false, LIC = { why:"need", contact:"", until:"" };
-async function fetchLic(){ const r = await fetch(LIC_URL + "?t=" + Date.now(), { cache:"no-store" }); if (!r.ok) throw new Error("http " + r.status); return r.json(); }
-function checkCode(j, code){
-  const c = j && j.codes && j.codes[String(code || "").trim().toUpperCase()];
-  if (!c) return { ok:false, why:"none" };
-  if (c.on === false) return { ok:false, why:"off" };
-  if (c.until && String(c.until) < todayStr()) return { ok:false, why:"expired", c };
-  return { ok:true, c };
+let LOCKED = false, LIC = { why:"login", until:"", err:"" };
+const toEmail = id => { id = String(id || "").trim(); return id.includes("@") ? id.toLowerCase() : (id.toLowerCase() + "@kong.app"); };
+async function sbAuth(grant, body){
+  const r = await fetch(`${SB_URL}/auth/v1/token?grant_type=${grant}`, { method:"POST", headers:{ apikey:SB_KEY, "Content-Type":"application/json" }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({})); if (!r.ok) { const e = new Error(j.error_description || j.msg || j.error || "auth"); e.status = r.status; throw e; } return j;
 }
-async function licOk(c, code){
-  S.set.licCode = String(code).trim().toUpperCase(); S.set.licOk = Date.now(); S.set.licCenter = c.center || ""; S.set.licUntil = c.until || "";
-  try { await IDB.put("kv", S.set); } catch(_){}
-  if (c.until){ const left = Math.round((parse(c.until) - parse(todayStr())) / 864e5); if (left <= 14) setTimeout(() => toast(`사용 기간이 ${left}일 남았어요`), 800); }
+async function sbAccess(token){
+  const r = await fetch(`${SB_URL}/rest/v1/kong_access?select=email,center,until,active`, { headers:{ apikey:SB_KEY, Authorization:`Bearer ${token}` }, cache:"no-store" });
+  if (!r.ok) { const e = new Error("access " + r.status); e.status = r.status; throw e; } const rows = await r.json(); return rows[0] || null;
+}
+async function saveSession(j){ S.set.auth = { at:j.access_token, rt:j.refresh_token, exp: Date.now() + (j.expires_in || 3600) * 1000, email: (j.user && j.user.email) || (S.set.auth || {}).email || "" }; try { await IDB.put("kv", S.set); } catch(_){} }
+function judge(row){
+  if (!row) return { ok:false, why:"noaccess" };
+  if (row.active === false) return { ok:false, why:"off" };
+  if (row.until && String(row.until) < todayStr()) return { ok:false, why:"expired", until:row.until };
+  return { ok:true, row };
+}
+async function accessOk(row){
+  S.set.licOk = Date.now(); S.set.licCenter = row.center || ""; S.set.licUntil = row.until || ""; try { await IDB.put("kv", S.set); } catch(_){}
+  if (row.until){ const left = Math.round((parse(row.until) - parse(todayStr())) / 864e5); if (left <= 14) setTimeout(() => toast(`사용 기간이 ${left}일 남았어요`), 800); }
 }
 async function licenseGate(){
   if (window.KONG_PREVIEW) return true;
-  let j = null; try { j = await Promise.race([fetchLic(), new Promise((_, rj) => setTimeout(() => rj(new Error("timeout")), 8000))]); } catch(_){}
-  const code = S.set.licCode;
-  if (j){ LIC.contact = j.contact || "";
-    if (!code){ LIC.why = "need"; return false; }
-    const r = checkCode(j, code); if (r.ok){ await licOk(r.c, code); return true; }
-    LIC.why = r.why; LIC.until = (r.c && r.c.until) || ""; return false; }
-  if (code && S.set.licOk && Date.now() - S.set.licOk < LIC_GRACE) return true;
-  LIC.why = code ? "offline" : "needOffline"; return false;
+  const A = S.set.auth; if (!A || !A.rt){ LIC.why = "login"; return false; }
+  try {
+    const j = await Promise.race([sbAuth("refresh_token", { refresh_token:A.rt }), new Promise((_, rj) => setTimeout(() => rj(Object.assign(new Error("timeout"), { net:true })), 8000))]);
+    await saveSession(j);
+    const r = judge(await sbAccess(j.access_token)); if (r.ok){ await accessOk(r.row); return true; }
+    LIC.why = r.why; LIC.until = r.until || ""; return false;
+  } catch(e){
+    if (e.status === 400 || e.status === 401){ S.set.auth = null; try { await IDB.put("kv", S.set); } catch(_){} LIC.why = "login"; LIC.err = "다시 로그인해 주세요"; return false; }
+    if (S.set.licOk && Date.now() - S.set.licOk < LIC_GRACE) return true;
+    LIC.why = "offline"; return false;
+  }
 }
 function viewLock(){
-  const msg = { need:"처음 한 번 사용 코드를 입력해 주세요", none:"등록되지 않은 코드예요. 코드를 다시 확인해 주세요", off:"사용이 중지된 코드예요",
-    expired:`사용 기간이 끝났어요${LIC.until ? ` (${dLong(LIC.until)}까지)` : ""}`, offline:"인터넷에 연결해서 사용 확인을 해 주세요", needOffline:"인터넷에 연결한 뒤 사용 코드를 입력해 주세요" }[LIC.why] || "";
+  const msg = { login:"아이디 · 비밀번호로 로그인해 주세요", noaccess:"이 계정은 사용 권한이 없어요", off:"사용이 중지된 계정이에요",
+    expired:`사용 기간이 끝났어요${LIC.until ? ` (${dLong(LIC.until)}까지)` : ""}`, offline:"인터넷에 연결해서 로그인 확인을 해 주세요" }[LIC.why] || "";
+  const form = LIC.why === "login";
   return `<section class="lock"><img src="icon-192.png" onerror="this.remove()" alt=""><div class="lock-k">K</div><h1>KONG 회원관리</h1><p>${esc(msg)}</p>
-    ${["offline"].includes(LIC.why) ? `<button class="btn primary block big" data-act="licRetry">다시 확인</button>` : `<input id="licCode" class="search" placeholder="사용 코드 (예: KONG-XXXX-XXXX)" autocapitalize="characters" autocomplete="off" value="${esc(LIC.why === "need" ? "" : S.set.licCode || "")}">
-    <button class="btn primary block big" data-act="licSubmit">확인</button>`}
-    <small>${esc(LIC.contact || "사용 문의는 콩 매니저에게 연락해 주세요")}</small></section>`;
+    ${LIC.err ? `<p class="lockerr">${esc(LIC.err)}</p>` : ""}
+    ${form ? `<input id="lgId" class="search" type="email" placeholder="아이디 (이메일)" autocomplete="username" autocapitalize="none" value="${esc((S.set.auth || {}).email || S.set.lastId || "")}">
+      <input id="lgPw" class="search" type="password" placeholder="비밀번호" autocomplete="current-password">
+      <button class="btn primary block big" data-act="login">로그인</button>`
+      : LIC.why === "offline" ? `<button class="btn primary block big" data-act="licRetry">다시 확인</button>`
+      : `<button class="btn block big" data-act="logout">다른 계정으로 로그인</button>`}
+    ${installBtn()}
+    <small>사용 문의는 콩 매니저에게 연락해 주세요</small></section>`;
 }
-
 /* ---------- 앱 설치 (PWA) ---------- */
 let installEvt = null;
+const installBtn = () => isApp() || window.KONG_PREVIEW ? "" : `<button class="btn installbtn block big" data-act="install">📲 앱 설치하기</button>`;
 const isApp = () => (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true;
 window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; if (top().name === "settings") render(); });
 window.addEventListener("appinstalled", () => { installEvt = null; toast("앱으로 설치했어요. 홈 화면에서 열어 주세요"); });
