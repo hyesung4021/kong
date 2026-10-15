@@ -1421,9 +1421,10 @@ async function loadVidPose(){
   vidLMp = (async () => {
     const V = "0.10.14", base = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${V}`;
     const mod = await import(`${base}/vision_bundle.mjs`); const fs = await mod.FilesetResolver.forVisionTasks(`${base}/wasm`);
-    const mk = d => mod.PoseLandmarker.createFromOptions(fs, { baseOptions:{ modelAssetPath:"https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task", delegate:d }, runningMode:"VIDEO", numPoses:1 });
-    let a, b; try { a = await mk("GPU"); b = await mk("GPU"); } catch(e){ a = await mk("CPU"); b = await mk("CPU"); }
-    vidLM = { a, b }; return vidLM;
+    const mk = d => mod.PoseLandmarker.createFromOptions(fs, { baseOptions:{ modelAssetPath:"https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task", delegate:d }, runningMode:"IMAGE", numPoses:1 });
+    let one; try { one = await mk("GPU"); } catch(e){ one = await mk("CPU"); }
+    /* 한 개로 비포 · 애프터 둘 다 인식 (폰에서 두 개 띄우면 하나가 멈추는 경우가 있어요) */
+    const w = { detectForVideo: (v) => one.detect(v) }; vidLM = { a: w, b: w }; return vidLM;
   })();
   try { return await vidLMp; } catch(e){ vidLMp = null; throw e; }
 }
@@ -1471,7 +1472,7 @@ function bavFrame(){
     if (BV.playing){
       ["a","b"].forEach(k => { const s = BV[k]; if (s && s.v.paused && !s.v.ended && (s.v.currentTime - s.start) < bavLen() - 0.05) s.v.play().catch(() => {}); });
       const pos = M.v.currentTime - M.start; BV.pos = pos;
-      if (BV.a && BV.b){ const want = BV.b.start + (BV.a.v.currentTime - BV.a.start); if (Math.abs(BV.b.v.currentTime - want) > 0.12) try { BV.b.v.currentTime = want; } catch(_){} }
+      if (BV.a && BV.b && !BV.b.v.seeking && (!BV.syncT || performance.now() - BV.syncT > 600)){ const want = BV.b.start + (BV.a.v.currentTime - BV.a.start); if (Math.abs(BV.b.v.currentTime - want) > 0.3){ BV.syncT = performance.now(); try { BV.b.v.currentTime = want; } catch(_){} } }
       if (pos >= bavLen() - 0.04 || M.v.ended){ bavPlay(false); if (BV.rec) BV.rec.stop(); }
       const sc = $("#bavScrub"); if (sc && !BV.drag) sc.value = BV.pos; const tl = $("#bavTime"); if (tl) tl.textContent = `${BV.pos.toFixed(1)}s / ${bavLen().toFixed(1)}s`;
     }
@@ -1484,7 +1485,7 @@ function bavFrame(){
       if (over.v.readyState >= 2){ ctx.globalAlpha = BV.alpha; ctx.drawImage(over.v, ox, oy, over.v.videoWidth * k, over.v.videoHeight * k); ctx.globalAlpha = 1; } }
     /* AI 자세 */
     if (BV.ai && vidLM){ [["a", base, tf.a, vidLM.a], ["b", over, tf.b, vidLM.b]].forEach(([key, s, t, lmk]) => { if (!s || !t || s.v.readyState < 2) return;
-        if (s.v.currentTime !== s.lastT){ try { const r = lmk.detectForVideo(s.v, (BV.ts = Math.max((BV.ts || 0) + 1, performance.now()))); s.lm = r && r.landmarks && r.landmarks[0] || null; } catch(e){ s.lm = null; } s.lastT = s.v.currentTime; } }); }
+        if (s.v.currentTime !== s.lastT && (!BV.playing || !s.aiT || performance.now() - s.aiT > 160)){ s.aiT = performance.now(); try { const r = lmk.detectForVideo(s.v, (BV.ts = Math.max((BV.ts || 0) + 1, performance.now()))); s.lm = r && r.landmarks && r.landmarks[0] || null; s.aiErr = s.lm ? "" : "사람을 못 찾음"; } catch(e){ s.lm = null; s.aiErr = "인식 오류"; } s.lastT = s.v.currentTime; } }); }
     const sides = [];
     if (BV.ai){ if (over) sides.push(["b", over, tf.b, "#FFFFFF"]); sides.push(["a", base, tf.a, "#C9A45C"]); }
     const mets = {};
@@ -1518,8 +1519,9 @@ function bavFrame(){
       rows.forEach(([n, bvv, avv], i) => { const yy = by + rh * (i + 2) - 2 * fs; ctx.font = `600 ${16 * fs}px "IBM Plex Sans KR", sans-serif`; ctx.fillStyle = "#E6EAE4"; ctx.fillText(n, bx + 12 * fs, yy);
         ctx.font = `800 ${18 * fs}px Barlow, sans-serif`; if (over){ ctx.fillStyle = "#FFFFFF"; ctx.fillText(bvv == null ? "-" : `${Math.round(bvv)}°`, bx + 170 * fs, yy); ctx.fillStyle = "#C9A45C"; ctx.fillText(avv == null ? "-" : `${Math.round(avv)}°`, bx + 252 * fs, yy); }
         else { ctx.fillStyle = "#C9A45C"; const v = avv ?? bvv; ctx.fillText(v == null ? "-" : `${Math.round(v)}°`, bx + 170 * fs, yy); } });
-      const tb = $("#bavTable"); if (tb && (!BV.tbT || performance.now() - BV.tbT > 250)){ BV.tbT = performance.now();
+      const tb = $("#bavTable"); if (tb && (!BV.tbT || performance.now() - BV.tbT > 250)){ const st = $("#bavAiSt"); if (st && vidLM) st.textContent = [over && `BEFORE ${over.lm ? "✓ 인식" : "✗ " + (over.aiErr || "확인 중")}`, `AFTER ${base.lm ? "✓ 인식" : "✗ " + (base.aiErr || "확인 중")}`].filter(Boolean).join(" · "); BV.tbT = performance.now();
         tb.innerHTML = rows.map(([n, bvv, avv]) => `<div><span>${n}</span>${over ? `<b class="bf">${bvv == null ? "-" : Math.round(bvv) + "°"}</b>` : ""}<b class="af">${(over ? avv : (avv ?? bvv)) == null ? "-" : Math.round(over ? avv : (avv ?? bvv)) + "°"}</b>${over && bvv != null && avv != null ? `<em>${avv - bvv > 0 ? "+" : ""}${Math.round(avv - bvv)}°</em>` : over ? "<em></em>" : ""}</div>`).join(""); } }
+    if (BV.ai && vidLM && (!BV.stT || performance.now() - BV.stT > 400)){ BV.stT = performance.now(); const st = $("#bavAiSt"); if (st) st.textContent = [over && `BEFORE ${over.lm ? "✓ 인식" : "✗ " + (over.aiErr || "확인 중")}`, `AFTER ${base.lm ? "✓ 인식" : "✗ " + (base.aiErr || "확인 중")}`].filter(Boolean).join(" · "); }
     /* 브랜드 */
     ctx.fillStyle = "rgba(31,43,38,.85)"; ctx.fillRect(0, H - 40 * fs, W, 40 * fs); ctx.fillStyle = "#C9A45C"; ctx.beginPath(); ctx.arc(18 * fs, H - 20 * fs, 5 * fs, 0, 7); ctx.fill();
     ctx.font = `700 ${16 * fs}px Barlow, "IBM Plex Sans KR", sans-serif`; ctx.fillStyle = "#FFFFFF"; ctx.fillText(`${(S.set.center || "").toUpperCase()} · ${S.set.trainer || ""}`, 32 * fs, H - 14 * fs);
