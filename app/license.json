@@ -1,0 +1,15 @@
+{
+  "contact": "사용 문의는 콩 매니저에게 연락해 주세요",
+  "codes": {
+    "KONG-T42Y-R3RF": {
+      "center": "콩 매니저 (본인)",
+      "until": "",
+      "on": true
+    },
+    "KONG-ENCS-DHCV": {
+      "center": "예시 센터 (사용 중지)",
+      "until": "2026-12-31",
+      "on": false
+    }
+  }
+}
