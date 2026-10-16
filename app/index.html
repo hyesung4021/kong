@@ -242,6 +242,10 @@ table.roster td[data-rc],table.roster th[data-rrow]{cursor:pointer}
 .rpal{display:flex;flex-wrap:wrap;gap:6px}
 .rcode{min-width:40px;height:34px;padding:0 8px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-weight:700;font-size:13px;color:var(--ink)}
 .rcode.on{box-shadow:0 0 0 3px var(--accent)}
+.modebar{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;border-radius:999px;background:color-mix(in srgb,var(--surface) 80%,transparent);border:1px solid var(--line)}
+.modebar[hidden]{display:none}
+.modebar button{padding:9px 0;border-radius:999px;font-weight:700;font-size:14px;color:var(--muted)}
+.modebar button.on{background:var(--accent);color:#fff}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(96px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:999px;font-size:14px;z-index:30;max-width:calc(100% - 32px)}
 h2.t{margin:0;font-size:15px;font-weight:600}
 .spark{width:100%;height:56px}
@@ -297,9 +301,9 @@ h2.t{margin:0;font-size:15px;font-weight:600}
   <div class="dock"><div class="in">
     <nav class="tabs">
       <button data-tab="today" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>오늘</button>
-      <button data-tab="schedule"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>스케줄</button>
+      <button data-tab="schedule"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span class="lb">스케줄</span></button>
       <button data-tab="members"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 7v10M18 7v10M3 9.5v5M21 9.5v5M6 12h12"/></svg>회원</button>
-      <button data-tab="promo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10v4a1 1 0 0 0 1 1h3l6 4V5L7 9H4a1 1 0 0 0-1 1z"/><path d="M17 8.5a5 5 0 0 1 0 7M20 6a9 9 0 0 1 0 12"/></svg>홍보</button>
+      <button data-tab="promo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10v4a1 1 0 0 0 1 1h3l6 4V5L7 9H4a1 1 0 0 0-1 1z"/><path d="M17 8.5a5 5 0 0 1 0 7M20 6a9 9 0 0 1 0 12"/></svg><span class="lb">홍보</span></button>
       <button data-tab="ops"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.2L3 17.8V21h3.2l6.3-6.3a4 4 0 0 0 5.2-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/></svg>시설</button>
       <button data-tab="admin" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/></svg>관리자</button>
     </nav>
@@ -491,6 +495,9 @@ const mine = m => !me || m.trainer_id===me.id;
 const inScope = m => scope!=="mine" || mine(m);
 const byName = (a,b) => (a.name||"").localeCompare(b.name||"","ko");
 const isAdmin = () => !!(me && me.role==="admin");
+const isFC = () => false;   /* FC 기능 꺼둠 */
+let viewMode = store.get("sg_mode") || "pt";   /* 관리자: 트레이너 관리 ⇄ FC 화면 전환 */
+const fcMode = () => false;
 const OWNER_EMAIL = "hyesung4021@naver.com";   /* 최고 관리자 계정 */
 const isOwnerT = t => !!(t && (t.email||"").toLowerCase()===OWNER_EMAIL);
 const isOwner = () => DEMO ? isAdmin() : isOwnerT(me);
@@ -541,7 +548,7 @@ async function withdrawCancel(t, r){ const row = Object.assign({}, r); row.cance
 const staffList = () => vals("trainers").sort((a,b) => (b.role==="admin")-(a.role==="admin") || byName(a,b));   /* 직원 전체 */
 const trainerList = () => staffList().filter(t => t.teaches!==false);   /* 수업하는 사람만 (스케줄·담당·매출) */
 const ownerOf = t => DEMO ? !!(t && t.id==="t1") : isOwnerT(t);
-const roleName = t => ownerOf(t) ? "관리자" : t && t.role==="admin" ? "관리자" : "트레이너";
+const roleName = t => ownerOf(t) ? "관리자" : t && t.role==="admin" ? "관리자" : t && t.role==="fc" ? "FC" : "트레이너";
 const tTitle = t => (t && t.title) || (t && t.role==="admin" ? "매니저" : "트레이너");
 const tName = id => id==="공동" ? "공동" : !id ? "담당 미지정" : (S.trainers[id] ? S.trainers[id].name : "퇴사한 트레이너");
 const tier = m => { const s=SET(), l=leftOf(m); return l < s.tier1 ? 1 : l < s.tier2 ? 2 : 3; };
@@ -758,18 +765,18 @@ function viewMembers(){
 
 /* ================= 탭: 홍보 ================= */
 function viewPromo(){
-  if (tab==="admin") promoSeg = "daily"; else if (promoSeg==="daily") promoSeg = "inquiry";
+  if (tab==="admin") promoSeg = "daily"; else if (promoSeg==="daily" || fcMode()) promoSeg = "inquiry";
   const t = todayStr(), mo = month(t), wks = promoWeeks(mo), cw = wks.find(w => t>=w.from && t<=w.to) || wks[wks.length-1], s = SET();
   const inW = d => d>=cw.from && d<=cw.to;
   const sum = (arr,k) => arr.reduce((a,p)=>a+(Number(p[k])||0),0);
   const pdW = vals("promo_daily").filter(p => inW(p.id));
   const inq = sum(pdW,"naver")+sum(pdW,"walkin")+sum(pdW,"phone"), aptW = vals("apt_promos").filter(a=>inW(a.date)).length, revW = vals("reviews").filter(r=>inW(r.date)).length;
   const wi = wks.indexOf(cw)+1;
-  let h = `<div class="pagehead"><div><div class="date">${Number(mo.slice(5))}월 ${wi}주차 · ${dShort(cw.from)}~${dShort(cw.to)}</div><h1>홍보</h1></div>${tab==="admin"?'<button class="btn primary small" data-act="daily">오늘 기록</button>':""}</div>
+  let h = `<div class="pagehead"><div><div class="date">${Number(mo.slice(5))}월 ${wi}주차 · ${dShort(cw.from)}~${dShort(cw.to)}</div><h1>${fcMode()?"상담":"홍보"}</h1></div>${tab==="admin"?'<button class="btn primary small" data-act="daily">오늘 기록</button>':""}</div>
     ${tab==="admin"?"":"<!--"}<div class="card"><div class="card-head"><h2>이번 주 목표</h2>${tab==="admin"?'<button class="more" data-aseg="settings">목표 수정</button>':""}</div>
       ${goalBar("문의 (네이버 예약·워크인·전화)", inq, s.inquiryGoal)}${goalBar("신규 등록", sum(pdW,"new_reg"), s.newRegGoal)}${goalBar("PT 신규", sum(pdW,"pt_new"), s.ptNewGoal)}
       ${goalBar("아파트 동·라인", aptW, s.aptGoal)}${goalBar("리뷰 작성", revW, s.reviewGoal)}</div>${tab==="admin"?"":"-->"}
-    ${tab==="admin" ? "" : segHtml(promoSeg, [["inquiry","상담"],["apt","아파트"],["review","리뷰"]], "out")}`;
+    ${tab==="admin" || fcMode() ? "" : segHtml(promoSeg, [["inquiry","상담"],["apt","아파트"],["review","리뷰"]], "out")}`;
   if (promoSeg==="inquiry"){
     const all = vals("leads"), c = st => all.filter(d=>d.status===st).length;
     const F = { open:d=>d.status==="new"||d.status==="scheduled", new:d=>d.status==="new", scheduled:d=>d.status==="scheduled", registered:d=>d.status==="registered", lost:d=>d.status==="lost" };
@@ -916,6 +923,144 @@ function rosterAsk(){
     s.querySelector("#raf").addEventListener("submit", async e => { e.preventDefault(); const r = s.querySelector("#ra_r").value.trim(); if (!r){ toast("내용을 적어 주세요"); return; }
       const row = {date:todayStr(), author_id:me&&me.id, body:`[근무 변경 요청] ${r}`, important:false, pinned:false, read_by:me?[me.id]:[]};
       if (await safe(() => api.save("notices", row), "변경 요청을 보냈어요")) closeSheet(); }); });
+}
+
+
+/* ================= FC (헬스 회원권 · 상담 · FC 매출) ================= */
+let fcSeg = "list", gmFilter = "active", gmQuery = "", fcTr = "", fcMonth = month(todayStr());
+const GYM_MONTHS = [1,3,6,12];
+const fcList = () => staffList().filter(t => t.role==="fc");
+const fcOptions = sel => `<option value="">미지정</option>` + staffList().filter(t => t.role==="fc" || t.role==="admin").map(t => `<option value="${esc(t.id)}" ${t.id===sel?"selected":""}>${esc(t.name)}${me&&t.id===me.id?" (나)":""}</option>`).join("");
+const gmLeft = g => g.end_on ? diffDays(g.end_on, todayStr()) : null;
+function gmState(g){ const d = gmLeft(g);
+  if (g.status==="paused") return {k:"paused", t:"홀딩", c:"mute"};
+  if (d===null) return {k:"active", t:"기간 없음", c:"mute"};
+  if (d < 0) return {k:"expired", t:`만료 ${-d}일`, c:"bad"};
+  if (d <= 14) return {k:"soon", t:`D-${d}`, c:"warn"};
+  return {k:"active", t:`D-${d}`, c:"ok"}; }
+function gymRow(g){ const st = gmState(g);
+  return `<div class="row tap" data-gym="${esc(g.id)}"><div class="grow"><div class="name">${esc(g.name)}${g.kind?` <span class="pill ${KIND_C[g.kind]||"mute"}">${esc(g.kind)}</span>`:""}</div>
+    <div class="sub">${esc([g.start_on&&g.end_on?`${dShort(g.start_on)}~${dShort(g.end_on)}`:"", g.fc_id?tName(g.fc_id):"", g.phone||""].filter(Boolean).join(" · "))}</div></div><span class="pill ${st.c}">${st.t}</span></div>`; }
+function fcStats(mo, fid){
+  const pays = vals("gym_payments").filter(p => month(p.paid_on)===mo && (!fid || p.fc_id===fid));
+  const by = {}; pays.forEach(p => { const k = p.kind||"기타"; by[k] = (by[k]||0)+1; });
+  const bm = {}; pays.forEach(p => { const k = (p.months||0)+"개월"; bm[k] = (bm[k]||0)+1; });
+  return { pays, sales: pays.reduce((a,p)=>a+(+p.amount||0),0), by, bm };
+}
+function viewFcToday(){
+  const t = todayStr(), title = me ? `${me.name} ${tTitle(me)}님` : "";
+  const notices = vals("notices").filter(noticeShown).sort((a,b)=>(b.important-a.important)||(b.pinned-a.pinned)||b.date.localeCompare(a.date));
+  const gms = vals("gym_members"), soon = gms.filter(g => gmState(g).k==="soon").sort((a,b)=>a.end_on.localeCompare(b.end_on));
+  const consults = vals("leads").filter(d => d.status==="scheduled" && d.consult_on===t), fresh = vals("leads").filter(d => d.status==="new");
+  const st = fcStats(month(t), isFC() ? me.id : "");
+  return `<div class="hello"><div class="date">${esc(dLong(t))}</div><h1>안녕하세요, ${esc(title)}</h1></div>${dutyToday()}
+    <div class="card"><div class="card-head"><h2>전달사항</h2><button class="more" data-act="newNotice">+ 전달</button></div>
+      ${notices.length?`<div class="list">${notices.map(noticeRow).join("")}</div>`:'<div class="emptyline">오늘 전달할 내용이 없어요</div>'}</div>
+    <div class="kpis"><div class="kpi"><b>${consults.length}</b><span>오늘 상담</span></div><div class="kpi sun"><b>${fresh.length}</b><span>신규 문의</span></div>
+      <div class="kpi ${soon.length?"alert":""}"><b>${soon.length}</b><span>만기 임박</span></div><div class="kpi"><b style="font-size:17px">${manwon(st.sales)}</b><span>이번 달 매출</span></div></div>
+    <div class="card"><div class="card-head"><h2>오늘 상담</h2><button class="more" data-act="newLead">+ 상담 등록</button></div>
+      ${consults.length?`<div class="list">${consults.map(leadRow).join("")}</div>`:'<div class="emptyline">오늘 잡힌 상담이 없어요</div>'}</div>
+    ${fresh.length?`<div class="card"><div class="card-head"><h2>연락할 신규 문의</h2><span class="pill hot">${fresh.length}</span></div><div class="list">${fresh.slice(0,8).map(leadRow).join("")}</div></div>`:""}
+    <div class="card"><div class="card-head"><h2>만기 임박 (14일 이내)</h2><button class="more" data-act="gymNew">+ 회원권</button></div>
+      ${soon.length?`<div class="list">${soon.slice(0,10).map(gymRow).join("")}</div>`:'<div class="emptyline">만기 임박 회원이 없어요</div>'}</div>`;
+}
+function viewFcRoster(){ const t = todayStr(); return `<div class="pagehead"><div><div class="date">${esc(dLong(t))}</div><h1>근무표</h1></div></div>` + dutyView(); }
+function gymListView(scopeFc){
+  const all = vals("gym_members").filter(g => !scopeFc || g.fc_id===scopeFc), q = gmQuery.trim().replace(/-/g,"");
+  const cnt = k => all.filter(g => gmState(g).k===k).length;
+  const F = {active:g=>["active","soon"].includes(gmState(g).k), soon:g=>gmState(g).k==="soon", expired:g=>gmState(g).k==="expired" && gmLeft(g)>=-60, all:()=>true};
+  const list = all.filter(F[gmFilter]||F.active).filter(g => !q || (g.name||"").includes(q) || (g.phone||"").replace(/-/g,"").includes(q))
+    .sort((a,b)=>(a.end_on||"9").localeCompare(b.end_on||"9"));
+  return `<div class="kpis"><div class="kpi"><b>${cnt("active")+cnt("soon")}</b><span>이용 중</span></div><div class="kpi ${cnt("soon")?"alert":""}"><b>${cnt("soon")}</b><span>만기 임박</span></div>
+      <div class="kpi"><b>${all.filter(g=>gmState(g).k==="expired"&&gmLeft(g)>=-60).length}</b><span>최근 만료</span></div><div class="kpi"><b>${all.length}</b><span>전체</span></div></div>
+    <input class="search" id="gq" value="${esc(gmQuery)}" placeholder="이름이나 전화번호 뒷자리로 찾기">
+    <div class="chips">${[["active","이용 중"],["soon","만기 임박"],["expired","최근 만료"],["all","전체"]].map(([k,t])=>`<button class="chip ${gmFilter===k?"on":""}" data-gmf="${k}">${t}</button>`).join("")}</div>
+    <div class="card">${list.length?`<div class="list">${list.map(gymRow).join("")}</div>`:'<div class="emptyline">해당하는 회원이 없어요</div>'}</div>`;
+}
+function fcSalesView(fid, showChips){
+  const mo = fcMonth, [y,m] = mo.split("-").map(Number), st = fcStats(mo, fid);
+  const target = fid ? (Number((S.trainers[fid]||{}).target)||0) : fcList().reduce((a,t)=>a+(Number(t.target)||0),0);
+  const prev = ymd(new Date(y,m-2,1)).slice(0,7), next = ymd(new Date(y,m,1)).slice(0,7);
+  const months = []; for (let i=5;i>=0;i--) months.push(ymd(new Date(y, m-1-i, 1)).slice(0,7));
+  const series = months.map(x => ({x, v: fcStats(x, fid).sales})), max = Math.max(1, ...series.map(s=>s.v));
+  const wk = salesWeeks(mo).map(w => { const ps = st.pays.filter(p => p.paid_on>=w.from && p.paid_on<=w.to).sort((a,b)=>a.paid_on.localeCompare(b.paid_on)); return {w, ps, amt: ps.reduce((a,p)=>a+(+p.amount||0),0)}; });
+  return `<div class="card"><div class="card-head"><button class="btn ghost small" data-fmo="${prev}" aria-label="이전 달">‹</button><h2 style="text-align:center">${y}년 ${m}월 FC 매출</h2><button class="btn ghost small" data-fmo="${next}" aria-label="다음 달">›</button></div>
+      ${showChips?`<div class="chips"><button class="chip ${!fcTr?"on":""}" data-fct="">FC 전체</button>${staffList().filter(t=>t.role==="fc"||t.role==="admin").map(t=>`<button class="chip ${fcTr===t.id?"on":""}" data-fct="${esc(t.id)}">${esc(t.name)}</button>`).join("")}</div>`:""}
+      <div class="statgrid s3"><div class="stat"><b style="font-size:18px">${manwon(target)}</b><span>목표 매출</span></div><div class="stat" style="background:var(--accent-soft)"><b style="color:var(--accent);font-size:18px">${manwon(st.sales)}</b><span>달성 매출</span></div><div class="stat"><b style="font-size:18px">${pct(st.sales,target)}%</b><span>달성률</span></div></div>
+      <div class="meter big"><i style="width:${Math.min(100,pct(st.sales,target))}%"></i></div>
+      <h2 class="t">등록 건수</h2><div class="statgrid s3"><div class="stat"><b>${st.by["신규"]||0}</b><span>신규</span></div><div class="stat"><b>${st.by["재등록"]||0}</b><span>재등록</span></div><div class="stat"><b>${st.pays.length}</b><span>합계</span></div></div>
+      <div class="legend">${GYM_MONTHS.map(n=>`<span>${n}개월 <b class="num">${st.bm[n+"개월"]||0}</b></span>`).join("")}</div></div>
+    <div class="card"><div class="card-head"><h2>주차별 등록 내역</h2></div>
+      ${wk.map((x,i)=>`<div style="display:flex;flex-direction:column;gap:2px;padding-top:6px;border-top:1px solid var(--tline)"><div class="card-head"><h2 style="font-size:14px">${i+1}주차 <span class="sub">${dShort(x.w.from)}~${dShort(x.w.to)}</span></h2><span class="num" style="font-size:14px;font-weight:600">${x.ps.length}건 · ${manwon(x.amt)}</span></div>
+        ${x.ps.length?`<div class="list">${x.ps.map(p=>{ const g=S.gym_members[p.gm_id], d=parse(p.paid_on); return `<div class="row tap" data-gym="${esc(p.gm_id)}"><div style="width:52px;flex:none;line-height:1.2"><b style="font-size:15px">${WD[d.getDay()]}요일</b><div class="sub">${dShort(p.paid_on)}</div></div><div class="grow"><div class="name">${esc(g?g.name:"-")} <span class="pill ${KIND_C[p.kind]||"mute"}">${esc(p.kind||"")}</span></div><div class="sub">${p.months}개월 · ${esc(tName(p.fc_id))} · ${esc(p.method||"")}</div></div><div class="left" style="font-size:16px">${manwon(p.amount)}</div></div>`; }).join("")}</div>`:'<div class="emptyline" style="font-size:13px">등록 없음</div>'}</div>`).join("")}</div>
+    <div class="card"><div class="card-head"><h2>월별 FC 매출</h2></div><div class="bars">${series.map(s=>`<div class="${s.x===mo?"cur":""}"><span class="num">${manwon(s.v)}</span><i style="height:${Math.max(4,Math.round(s.v/max*60))}px"></i><span>${Number(s.x.slice(5))}월</span></div>`).join("")}</div></div>`;
+}
+function viewFcMembers(){
+  return `<div class="pagehead"><div><div class="date">헬스 회원권</div><h1>회원권</h1></div><button class="btn primary small" data-act="gymNew">+ 등록</button></div>
+    ${segHtml(fcSeg, [["list","회원 목록"],["sales",isAdmin()?"FC 매출":"내 매출"]], "out")}` + (fcSeg==="sales" ? (isAdmin() ? fcSalesView(fcTr, true) : fcSalesView(me&&me.id, false)) : gymListView(""));
+}
+function fcAdminView(){
+  return segHtml(fcSeg, [["list","회원권 회원"],["sales","FC 매출"]], "out") + (fcSeg==="sales" ? fcSalesView(fcTr, true) : gymListView(""));
+}
+function gymForm(g, preset){
+  const isNew = !g; g = g || Object.assign({kind:"신규", fc_id: me&&me.id, start_on: todayStr()}, preset||{});
+  openSheet(`${head(isNew?"헬스 회원권 등록":"회원권 정보 수정")}<form id="gf2" class="form">
+      <div class="two"><div class="field"><label for="g_n">이름</label><input id="g_n" required maxlength="30" value="${esc(g.name)}"></div><div class="field"><label for="g_p">전화번호</label><input id="g_p" inputmode="tel" maxlength="20" value="${esc(g.phone)}" placeholder="010-0000-0000"></div></div>
+      ${isNew?`<div class="field"><label>구분</label><div class="chips wrapc" id="g_k">${["신규","재등록","양도"].map(k=>`<button type="button" class="chip ${g.kind===k?"on":""}" data-k="${k}">${k}</button>`).join("")}</div></div>
+      <div class="field"><label>기간</label><div class="chips wrapc" id="g_m">${GYM_MONTHS.map(n=>`<button type="button" class="chip ${n===3?"on":""}" data-m="${n}">${n}개월</button>`).join("")}</div></div>
+      <div class="two"><div class="field"><label for="g_s">시작일</label><input id="g_s" type="date" value="${esc(g.start_on||todayStr())}"></div><div class="field"><label for="g_a">금액 (원)</label><input id="g_a" inputmode="numeric" placeholder="0"></div></div>
+      <div class="two"><div class="field"><label for="g_me">결제</label><select id="g_me">${METHODS.map(x=>`<option>${x}</option>`).join("")}</select></div><div class="field"><label for="g_f">담당 FC</label><select id="g_f">${fcOptions(g.fc_id)}</select></div></div>`
+      : `<div class="two"><div class="field"><label for="g_s">시작일</label><input id="g_s" type="date" value="${esc(g.start_on||"")}"></div><div class="field"><label for="g_e">종료일</label><input id="g_e" type="date" value="${esc(g.end_on||"")}"></div></div>
+      <div class="two"><div class="field"><label for="g_f">담당 FC</label><select id="g_f">${fcOptions(g.fc_id)}</select></div><div class="field"><label for="g_st">상태</label><select id="g_st"><option value="active" ${g.status!=="paused"?"selected":""}>이용 중</option><option value="paused" ${g.status==="paused"?"selected":""}>홀딩</option></select></div></div>`}
+      <div class="field"><label for="g_memo">메모</label><textarea id="g_memo" maxlength="300">${esc(g.memo)}</textarea></div>
+      <button class="btn primary block" type="submit">${isNew?"등록":"저장"}</button></form>`, s => {
+    let kind = g.kind || "신규", months = 3;
+    const kb = s.querySelector("#g_k"); kb && kb.addEventListener("click", e => { const c=e.target.closest("[data-k]"); if(!c) return; kind=c.dataset.k; kb.querySelectorAll(".chip").forEach(x=>x.classList.toggle("on",x===c)); });
+    const mb = s.querySelector("#g_m"); mb && mb.addEventListener("click", e => { const c=e.target.closest("[data-m]"); if(!c) return; months=Number(c.dataset.m); mb.querySelectorAll(".chip").forEach(x=>x.classList.toggle("on",x===c)); });
+    const am = s.querySelector("#g_a"); am && am.addEventListener("input", () => { const v=am.value.replace(/[^0-9]/g,""); am.value = v?Number(v).toLocaleString("ko-KR"):""; });
+    s.querySelector("#gf2").addEventListener("submit", async e => { e.preventDefault();
+      const name = s.querySelector("#g_n").value.trim(); if (!name) return;
+      const base = { name, phone:s.querySelector("#g_p").value.trim(), memo:s.querySelector("#g_memo").value.trim(), fc_id:s.querySelector("#g_f").value||null };
+      if (!isNew){ const row = Object.assign({}, g, base, {start_on:s.querySelector("#g_s").value||null, end_on:s.querySelector("#g_e").value||null, status:s.querySelector("#g_st").value});
+        if (await safe(() => api.save("gym_members", row), "저장했어요")){ closeSheet(); gymDetail(row.id); } return; }
+      const start = s.querySelector("#g_s").value || todayStr(), end = addDays(addMonths(start, months), -1), amount = numOf(am.value);
+      const saved = await safe(() => api.save("gym_members", Object.assign(base, {kind, start_on:start, end_on:end, status:"active", created_at:new Date().toISOString()}))); if (!saved) return;
+      await safe(() => api.save("gym_payments", {gm_id:saved.id, fc_id:base.fc_id, paid_on:todayStr(), months, amount, kind, method:s.querySelector("#g_me").value, memo:""}), `${kind} ${months}개월 등록했어요`);
+      if (preset && preset._leadId && S.leads[preset._leadId]) await safe(() => api.save("leads", Object.assign({}, S.leads[preset._leadId], {status:"registered"})));
+      closeSheet(); gymDetail(saved.id); });
+  });
+}
+function gymDetail(id){
+  const g = S.gym_members[id]; if (!g) return; const st = gmState(g);
+  const pays = vals("gym_payments").filter(p => p.gm_id===id).sort((a,b)=>b.paid_on.localeCompare(a.paid_on));
+  openSheet(`${head(esc(g.name))}<div class="sub">${g.kind?`<span class="pill ${KIND_C[g.kind]||"mute"}">${esc(g.kind)}</span> `:""}<span class="pill ${st.c}">${st.t}</span></div>
+    <dl class="kv"><div><dt>기간</dt><dd>${esc(g.start_on||"-")} ~ ${esc(g.end_on||"-")}</dd></div><div><dt>전화번호</dt><dd style="user-select:all">${esc(g.phone||"-")}</dd></div><div><dt>담당 FC</dt><dd>${esc(tName(g.fc_id))}</dd></div></dl>
+    ${g.memo?`<div class="hist"><div class="h">${esc(g.memo)}</div></div>`:""}
+    <button class="btn primary block" data-act="renew">재등록 (기간 연장)</button>
+    <div class="actions">${g.phone?`<a class="btn ghost small" href="tel:${esc(tel(g.phone))}">전화</a>`:""}<button class="btn ghost small" data-act="edit">수정</button>${isAdmin()?'<button class="btn danger small" data-act="del">삭제</button>':""}</div>
+    <h2 class="t">결제 내역</h2><div class="hist">${pays.length?pays.map(p=>`<div class="h"><div class="d"><span>${esc(p.paid_on)} · ${esc(p.kind||"")} · ${p.months}개월 · ${esc(p.method||"")} · ${esc(tName(p.fc_id))}</span></div>${won(p.amount)}</div>`).join(""):'<div class="emptyline">결제 내역이 없어요</div>'}</div>`, s => {
+    s.addEventListener("click", async e => { const a = e.target.closest("[data-act]"); if (!a) return;
+      if (a.dataset.act==="edit") gymForm(g);
+      if (a.dataset.act==="renew") gymRenew(g);
+      if (a.dataset.act==="del"){ if (await safe(() => api.remove("gym_members", id), "삭제했어요")){ vals("gym_payments").filter(p=>p.gm_id===id).forEach(p=>delete S.gym_payments[p.id]); closeSheet(); render(); } } });
+  });
+}
+function gymRenew(g){
+  const t = todayStr(), from = g.end_on && g.end_on >= t ? addDays(g.end_on, 1) : t;
+  openSheet(`${head(`${esc(g.name)} 재등록`)}<form id="grf" class="form">
+      <div class="field"><label>기간</label><div class="chips wrapc" id="gr_m">${GYM_MONTHS.map(n=>`<button type="button" class="chip ${n===3?"on":""}" data-m="${n}">${n}개월</button>`).join("")}</div></div>
+      <div class="two"><div class="field"><label for="gr_s">시작일</label><input id="gr_s" type="date" value="${from}"></div><div class="field"><label for="gr_a">금액 (원)</label><input id="gr_a" inputmode="numeric" placeholder="0"></div></div>
+      <div class="two"><div class="field"><label for="gr_me">결제</label><select id="gr_me">${METHODS.map(x=>`<option>${x}</option>`).join("")}</select></div><div class="field"><label for="gr_f">담당 FC</label><select id="gr_f">${fcOptions(me&&isFC()?me.id:g.fc_id)}</select></div></div>
+      <button class="btn primary block" type="submit">재등록</button></form>`, s => {
+    let months = 3; const mb = s.querySelector("#gr_m"); mb.addEventListener("click", e => { const c=e.target.closest("[data-m]"); if(!c) return; months=Number(c.dataset.m); mb.querySelectorAll(".chip").forEach(x=>x.classList.toggle("on",x===c)); });
+    const am = s.querySelector("#gr_a"); am.addEventListener("input", () => { const v=am.value.replace(/[^0-9]/g,""); am.value = v?Number(v).toLocaleString("ko-KR"):""; });
+    s.querySelector("#grf").addEventListener("submit", async e => { e.preventDefault();
+      const start = s.querySelector("#gr_s").value || from, end = addDays(addMonths(start, months), -1), fid = s.querySelector("#gr_f").value || null;
+      const pay = await safe(() => api.save("gym_payments", {gm_id:g.id, fc_id:fid, paid_on:t, months, amount:numOf(am.value), kind:"재등록", method:s.querySelector("#gr_me").value, memo:""})); if (!pay) return;
+      const row = Object.assign({}, S.gym_members[g.id]||g, {end_on:end, kind:"재등록", status:"active", fc_id: fid || g.fc_id});
+      if (!row.start_on || (g.end_on && g.end_on < t)) row.start_on = start;
+      if (await safe(() => api.save("gym_members", row), `재등록 ${months}개월 · ${end}까지`)){ closeSheet(); gymDetail(g.id); } });
+  });
 }
 
 /* ================= 관리자 메뉴 (관리자만 · 센터 전체) ================= */
@@ -1118,9 +1263,14 @@ function settingsView(){
 /* ================= 렌더 ================= */
 function render(){
   if ($("#appView").hidden) return;
-  if (tab==="admin" && !isAdmin()) tab = "today";
+  if (tab==="admin" && (!isAdmin() || fcMode())) tab = "today";
+  
   lockScope();
-  { const nav = document.querySelector("nav.tabs"), ab = nav.querySelector("[data-tab=admin]"); ab.hidden = !isAdmin(); nav.classList.toggle("six", isAdmin()); }
+  if (fcMode() && (tab==="members")) tab = "fcmem";
+  if (!fcMode() && tab==="fcmem") tab = "today";
+  { const nav = document.querySelector("nav.tabs"), ab = nav.querySelector("[data-tab=admin]"); ab.hidden = !isAdmin() || fcMode(); nav.classList.toggle("six", isAdmin() && !fcMode());
+    nav.querySelector("[data-tab=members]").hidden = false;
+    nav.querySelector("[data-tab=schedule] .lb").textContent = fcMode() ? "근무표" : "스케줄"; nav.querySelector("[data-tab=promo] .lb").textContent = fcMode() ? "상담" : "홍보"; }
   $("#demoBanner").hidden = !DEMO; $("#upgradeBanner").hidden = DEMO || !missing.size;
   $("#avatarBtn").textContent = initial(me && me.name);
   const leadN = vals("leads").filter(d => d.status==="new").length, f = facTodo(), opsN = f.order + f.bad;
@@ -1132,7 +1282,7 @@ function render(){
   });
   const v = $("#view"), hadFocus = document.activeElement && document.activeElement.id==="q", sy = window.scrollY;
   const rg0 = document.getElementById("rgrid"); if (rg0) rosterScroll = rg0.scrollLeft;
-  v.innerHTML = ({today:viewToday, schedule:viewSchedule, members:viewMembers, promo:viewPromo, ops:viewOps, admin:viewAdmin}[tab] || viewToday)();
+  v.innerHTML = (fcMode() ? ({today:viewFcToday, schedule:viewFcRoster, fcmem:viewFcMembers, promo:viewPromo, ops:viewOps}[tab] || viewFcToday) : ({today:viewToday, schedule:viewSchedule, members:viewMembers, promo:viewPromo, ops:viewOps, admin:viewAdmin}[tab] || viewToday))();
   if (hadFocus){ const q=$("#q"); q.focus(); q.setSelectionRange(q.value.length,q.value.length); }
   { const rg = document.getElementById("rgrid"); if (rg){ if (rosterScroll!==null) rg.scrollLeft = rosterScroll; else { const td = rg.querySelector("thead th.today"); if (td) rg.scrollLeft = Math.max(0, td.offsetLeft - 140); } } }
   if (tab==="schedule" && schedView==="day"){ const on=v.querySelector(".day.on"), box=$("#days"); if (on && box) box.scrollLeft = on.offsetLeft - box.clientWidth/2 + on.clientWidth/2; }
@@ -1532,13 +1682,14 @@ function leadDetail(id){
       <div><dt>문의 경로</dt><dd>${esc(d.source||"-")}</dd></div><div><dt>상담 일정</dt><dd>${d.consult_on?esc(dLong(d.consult_on)+" "+(d.consult_time||"")):"미정"}</dd></div>
       <div><dt>담당</dt><dd>${esc(tName(d.trainer_id))}</dd></div><div><dt>문의일</dt><dd>${esc((d.created_at||"").slice(0,10)||"-")}</dd></div></dl>
     ${d.memo?`<div class="hist"><div class="h">${esc(d.memo)}</div></div>`:""}
-    ${d.status!=="registered" ? `<button class="btn primary block" data-act="convert">회원으로 등록하기</button>` : (d.member_id && S.members[d.member_id] ? `<button class="btn okb block" data-act="openMember">등록된 회원 보기</button>` : "")}
+    ${d.status!=="registered" ? `<button class="btn primary block" data-act="${fcMode()?"toGym":"convert"}">${fcMode()?"헬스 회원권 등록하기":"PT 회원으로 등록하기"}</button><button class="btn ghost block" data-act="${fcMode()?"convert":"toGym"}">${fcMode()?"PT 회원으로 등록하기":"헬스 회원권 등록하기"}</button>` : (d.member_id && S.members[d.member_id] ? `<button class="btn okb block" data-act="openMember">등록된 회원 보기</button>` : "")}
     <div class="actions">${d.phone?`<a class="btn ghost small" href="tel:${esc(tel(d.phone))}">전화</a>`:""}<button class="btn ghost small" data-act="edit">수정</button>
       ${d.status!=="lost"&&d.status!=="registered"?'<button class="btn ghost small" data-act="lost">보류로</button>':""}${d.status==="lost"?'<button class="btn ghost small" data-act="reopen">다시 진행</button>':""}<button class="btn danger small" data-act="del">삭제</button></div>`, s => {
     s.addEventListener("click", async e => { const a = e.target.closest("[data-act]"); if (!a) return;
       switch(a.dataset.act){
         case "convert": memberForm(null, {name:clean(d.name), phone:d.phone, trainer_id:d.trainer_id, source:d.source, memo:d.memo, _leadId:d.id}); break;
         case "openMember": memberDetail(d.member_id); break;
+        case "toGym": gymForm(null, {name:clean(d.name), phone:d.phone, memo:d.memo, _leadId:d.id}); break;
         case "edit": leadForm(d); break;
         case "lost": if (await safe(() => api.save("leads", Object.assign({}, d, {status:"lost"})), "보류로 옮겼어요")) closeSheet(); break;
         case "reopen": if (await safe(() => api.save("leads", Object.assign({}, d, {status:d.consult_on?"scheduled":"new"})), "다시 진행해요")) closeSheet(); break;
@@ -1747,7 +1898,7 @@ function trainerDetail(tid){
     ${canManage?`<form id="trf" class="form"><div class="two"><div class="field"><label for="tr_n">이름</label><input id="tr_n" maxlength="20" value="${esc(tr.name)}"></div><div class="field"><label for="tr_ti">호칭</label><input id="tr_ti" maxlength="10" value="${esc(tTitle(tr))}"></div></div><div class="field"><label for="tr_t">월 매출 목표(원)</label><input id="tr_t" inputmode="numeric" value="${comma(tr.target||0)}"></div><button class="btn primary" type="submit">저장</button></form>`:""}
     ${isOwner()?`<div class="field"><label>수업</label><div class="seg" role="group"><button type="button" class="${tr.teaches!==false?"on":""}" data-teach="1">수업함</button><button type="button" class="${tr.teaches===false?"on":""}" data-teach="0">수업 안 함</button></div></div>`:""}
     ${tr.teaches===false?"":`<h2 class="t">담당 회원 (잔여 적은 순)</h2>${ms.length?`<div class="list">${ms.map(memberRow).join("")}</div>`:'<div class="emptyline">담당 회원이 없어요</div>'}`}
-    ${canManage && (!me || tid!==me.id) && !isOwnerT(tr)?`<div class="actions">${isOwner()?`<button class="btn ghost small" data-act="role">${tr.role==="admin"?"트레이너로 변경":"관리자 권한 주기"}</button>`:""}<button class="btn danger small" data-act="askOut">내보내기</button></div>`:""}<div id="outBox"></div>`, s => {
+    ${canManage && (!me || tid!==me.id) && !isOwnerT(tr)?`<div class="actions">${isOwner()?[["trainer","트레이너로"],["admin","관리자로"]].filter(([r])=>r!==tr.role).map(([r,t])=>`<button class="btn ghost small" data-act="role" data-role="${r}">${t} 변경</button>`).join(""):""}<button class="btn danger small" data-act="askOut">내보내기</button></div>`:""}<div id="outBox"></div>`, s => {
     const f = s.querySelector("#trf"); if (f){ const t=s.querySelector("#tr_t"); t.addEventListener("input",()=>{ const v=t.value.replace(/[^0-9]/g,""); t.value=v?Number(v).toLocaleString("ko-KR"):""; });
       f.addEventListener("submit", async e => { e.preventDefault(); const nm = s.querySelector("#tr_n").value.trim()||tr.name;
         if (await safe(() => api.save("trainers", Object.assign({}, tr, {name:nm, title:s.querySelector("#tr_ti").value.trim()||null, target:numOf(t.value)})), "저장했어요")){ if (me && me.id===tid) me = S.trainers[tid]; trainerDetail(tid); } }); }
@@ -1758,7 +1909,8 @@ function trainerDetail(tid){
         if (await safe(() => api.save("trainers", Object.assign({}, tr, {teaches:v})), v?"수업함으로 바꿨어요":"수업 안 함으로 바꿨어요")){ if (me && me.id===tid) me = S.trainers[tid]; trainerDetail(tid); } return; }
       const a = e.target.closest("[data-act]"); if (!a) return;
       switch(a.dataset.act){
-        case "role": if (!isOwner()){ toast("권한을 바꿀 수 있는 권한이 없어요"); break; } if (await safe(() => api.save("trainers", Object.assign({}, tr, {role: tr.role==="admin"?"trainer":"admin"})), "권한을 바꿨어요")) trainerDetail(tid); break;
+        case "role": if (!isOwner()){ toast("권한을 바꿀 수 있는 권한이 없어요"); break; } { const nr = a.dataset.role || "trainer"; if (nr==="fc" && ms.length){ toast(`담당 회원 ${ms.length}명을 먼저 다른 트레이너에게 넘겨 주세요`); break; }
+          if (await safe(() => api.save("trainers", Object.assign({}, tr, {role:nr, teaches: nr==="fc" ? false : tr.teaches})), "권한을 바꿨어요")) trainerDetail(tid); } break;
         case "askOut": s.querySelector("#outBox").innerHTML = `<div class="confirm">${esc(tr.name)} 트레이너를 내보낼까요? 더 이상 데이터를 볼 수 없고, 담당 회원 ${ms.length}명은 '담당 미지정'이 돼요.<div class="actions"><button class="btn danger small" data-act="doOut">내보내기</button><button class="btn ghost small" data-close>취소</button></div></div>`; break;
         case "doOut": if (await safe(() => api.remove("trainers", tid), "내보냈어요")) closeSheet(); break;
       } });
@@ -1774,7 +1926,7 @@ function trainerForm(){
     s.querySelector("#tf").addEventListener("submit", async e => { e.preventDefault();
       const email = s.querySelector("#t_email").value.trim().toLowerCase(), name = s.querySelector("#t_name").value.trim();
       if (vals("trainers").some(t => (t.email||"").toLowerCase()===email)){ toast("이미 등록된 이메일이에요"); return; }
-      if (await safe(() => api.save("trainers", {name, email, role:isOwner()?s.querySelector("#t_role").value:"trainer", teaches:s.querySelector("#t_teach").checked, target:numOf(s.querySelector("#t_tg").value), commission:0}), "트레이너를 추가했어요")){
+      if (await safe(() => api.save("trainers", {name, email, role:isOwner()?s.querySelector("#t_role").value:"trainer", teaches:s.querySelector("#t_role").value==="fc" ? false : s.querySelector("#t_teach").checked, target:numOf(s.querySelector("#t_tg").value), commission:0}), "트레이너를 추가했어요")){
         closeSheet(); toast(`${name}님이 사이트에서 ${email}로 가입하면 바로 쓸 수 있어요`); } });
   });
 }
@@ -1819,7 +1971,7 @@ $("#view").addEventListener("click", async e => {
   if ((x=g("[data-tdo]"))){ await taskDo(x.dataset.id, x.dataset.tdo); return; }
   if ((x=g("[data-qty]"))){ const s=S.supplies[x.dataset.id]; const q=Math.max(0,(Number(s.qty)||0)+Number(x.dataset.qty)); await safe(() => api.save("supplies", Object.assign({}, s, {qty:q}))); return; }
   if ((x=g("[data-scope]"))){ scope=x.dataset.scope; store.set("sg_scope",scope); if (scope==="mine") trFilter=""; render(); return; }
-  if ((x=g("[data-seg]"))){ const k=x.dataset.seg; if (tab==="schedule" || (tab==="admin" && adminSeg==="schedule")){ schedView=k; store.set("sg_sched",k); } else if (tab==="promo") promoSeg=k; else if (tab==="members") memSeg=k; else if (tab==="ops"){ opsSeg=k; trFilter=""; } render(); return; }
+  if ((x=g("[data-seg]"))){ const k=x.dataset.seg; if (tab==="schedule" || (tab==="admin" && adminSeg==="schedule")){ schedView=k; store.set("sg_sched",k); } else if (tab==="promo") promoSeg=k; else if (tab==="members") memSeg=k; else if (tab==="fcmem") fcSeg=k; else if (tab==="ops"){ opsSeg=k; trFilter=""; } render(); return; }
   if ((x=g("[data-day]"))){ selDay=x.dataset.day; render(); return; }
   if ((x=g("[data-wk]"))){ weekOf=x.dataset.wk; render(); return; }
   if ((x=g("[data-gt]"))){ gridTrainer=x.dataset.gt; render(); return; }
@@ -1837,6 +1989,10 @@ $("#view").addEventListener("click", async e => {
   if ((x=g("[data-member]"))){ memberDetail(x.dataset.member); return; }
   if ((x=g("[data-aseg]"))){ if (!isAdmin()) return; adminSeg=x.dataset.aseg; trFilter=""; if (adminSeg==="members"){ memTr="all"; if (x.dataset.filter) mFilter=x.dataset.filter; } if (adminSeg==="schedule") gridTrainer=""; if (tab!=="admin"){ const keep=memTr; go("admin"); if (adminSeg==="members"){ memTr=keep; render(); } } else { window.scrollTo(0,0); render(); } return; }
   if ((x=g("[data-dmo]"))){ dutyMonth=x.dataset.dmo; rosterScroll=null; render(); return; }
+  if ((x=g("[data-gym]"))){ gymDetail(x.dataset.gym); return; }
+  if ((x=g("[data-gmf]"))){ gmFilter = x.dataset.gmf; render(); return; }
+  if ((x=g("[data-fmo]"))){ fcMonth = x.dataset.fmo; render(); return; }
+  if ((x=g("[data-fct]"))){ fcTr = x.dataset.fct; render(); return; }
   if ((x=g("[data-rc]"))){ rosterPaint(x); return; }
   if ((x=g("[data-rcode]"))){ rosterCode = x.dataset.rcode; document.querySelectorAll("[data-rcode]").forEach(b => b.classList.toggle("on", b===x)); return; }
   if ((x=g("[data-rrow]"))){ rosterRowForm(x.dataset.rrow); return; }
@@ -1859,11 +2015,12 @@ $("#view").addEventListener("click", async e => {
   if ((x=g("[data-meeting]"))){ const mg=S.meetings[x.dataset.meeting]; if (mg) (isAdmin()?meetingForm:meetingRead)(mg); return; }
   if (!(x=g("[data-act]"))) return;
   ({ newLesson:()=>lessonForm(), newBlock:()=>blockForm(), newMember:()=>memberForm(), newLead:()=>leadForm(), newTrainer:()=>trainerForm(), newDeal:()=>dealForm(),
-     daily:()=>dailyForm(), newNotice:()=>noticeForm(), rosterMake:()=>{ rosterSave(dutyMonth, rosterNew(dutyMonth), true); rosterEdit = true; render(); }, rosterEdit:()=>{ rosterEdit = !rosterEdit; render(); }, rosterFill:()=>rosterFill(), rosterRow:()=>rosterRowForm(null), rosterNote:()=>rosterNoteForm(), rosterAsk:()=>rosterAsk(), newMeeting:()=>{ if (isAdmin()) meetingForm(); else toast("회의록은 관리자만 쓸 수 있어요"); }, meetAll:()=>meetingAll(), newApt:()=>aptForm(), newReview:()=>reviewForm(), newTask:()=>taskForm(), newRepair:()=>repairForm(), newSupply:()=>supplyForm(), loadPreset,
+     daily:()=>dailyForm(), newNotice:()=>noticeForm(), gymNew:()=>gymForm(), rosterMake:()=>{ rosterSave(dutyMonth, rosterNew(dutyMonth), true); rosterEdit = true; render(); }, rosterEdit:()=>{ rosterEdit = !rosterEdit; render(); }, rosterFill:()=>rosterFill(), rosterRow:()=>rosterRowForm(null), rosterNote:()=>rosterNoteForm(), rosterAsk:()=>rosterAsk(), newMeeting:()=>{ if (isAdmin()) meetingForm(); else toast("회의록은 관리자만 쓸 수 있어요"); }, meetAll:()=>meetingAll(), newApt:()=>aptForm(), newReview:()=>reviewForm(), newTask:()=>taskForm(), newRepair:()=>repairForm(), newSupply:()=>supplyForm(), loadPreset,
      copyOrder:()=>copy(`[${SET().gymName}] 발주 필요 목록\n`+vals("supplies").filter(s=>supplyState(s).k==="order").map(s=>`- ${s.name} (현재 ${s.qty}${s.unit||""} / 최소 ${s.min_qty}${s.unit||""})${s.vendor?" · "+s.vendor:""}`).join("\n")) }[x.dataset.act] || (()=>{}))();
 });
-$("#view").addEventListener("input", e => { if (e.target.id==="q"){ query=e.target.value; render(); } });
+$("#view").addEventListener("input", e => { if (e.target.id==="q"){ query=e.target.value; render(); } if (e.target.id==="gq"){ gmQuery=e.target.value; render(); const q=$("#gq"); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); } } });
 $("#fab").addEventListener("click", () => {
+  if (fcMode()){ if (tab==="promo") return leadForm(); if (tab==="ops") return repairForm(); return gymForm(); }
   if (tab==="members") return memSeg==="sales" ? dealForm() : memberForm();
   if (tab==="schedule") return lessonForm();
   if (tab==="promo") return promoSeg==="apt" ? aptForm() : promoSeg==="review" ? reviewForm() : promoSeg==="daily" ? dailyForm() : leadForm();
@@ -1874,6 +2031,8 @@ $("#fab").addEventListener("click", () => {
   addMenu();
 });
 $("#avatarBtn").addEventListener("click", accountSheet);
+false && document.body.addEventListener("click", e => { const b = e.target.closest("[data-vmode]"); if (!b || !isAdmin()) return; if ((fcMode()?"fc":"pt")===b.dataset.vmode) return;
+  viewMode = b.dataset.vmode; store.set("sg_mode", viewMode); tab = "today"; store.set("sg_tab", tab); window.scrollTo(0,0); render(); toast(viewMode==="fc" ? "FC 화면으로 바꿨어요" : "PT 화면으로 바꿨어요"); });
 $("#themeBtn").addEventListener("click", () => {
   const cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
   const next = cur==="dark" ? "light" : "dark"; document.documentElement.dataset.theme = next; store.set("sg_theme", next);
