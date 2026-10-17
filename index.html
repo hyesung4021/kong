@@ -116,6 +116,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .btn:disabled{opacity:.45;cursor:default}
 .linkbtn{font-size:12px;color:var(--bad)}
 .hint{text-align:center;font-size:13px;color:var(--muted);margin:0}
+.aptc{padding:12px 0;border-top:1px solid var(--line)}.aptc:first-of-type{border-top:0}
+.aptc-h{display:flex;align-items:baseline;gap:8px;margin-bottom:8px}.aptc-h b{font-size:16px}
+.aptc-n{margin-left:auto;font-family:var(--font-num);font-weight:700;font-size:14px;color:var(--muted)}.aptc-n.full{color:var(--ok,#1F6E4A)}
+.aptd{display:flex;align-items:center;gap:10px;padding:4px 0}.aptd-l{width:46px;flex:none;font-size:13px;font-weight:700;color:var(--muted)}
+.aptd-c{display:flex;flex-wrap:wrap;gap:6px}
 .chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
 .chips::-webkit-scrollbar{display:none}
 .chips.wrapc{flex-wrap:wrap;overflow:visible}
@@ -368,6 +373,17 @@ let promoSeg = "inquiry", opsSeg = "sales", facSeg = "todo";
 
 /* ================= 설정 ================= */
 const DEFAULTS = { tier1:10, tier2:30, renew:5, inquiryGoal:20, aptGoal:10, newRegGoal:5, ptNewGoal:2, reviewGoal:4, gymName:"더스카이짐 헬스&PT 일산본점" };
+/* 아파트 홍보 단지 · 동 · 라인 */
+const APTS = [
+  {name:"메가시티", homes:178, dongs:[["전체",["전체"]]]},
+  {name:"쌍용", homes:496, dongs:[["101",["1-2","3-4"]],["102",["1-2","3-4"]],["103",["1-2","3-4","5-8"]],["104",["1-6"]]]},
+  {name:"에이스 9차", homes:332, dongs:[["101",["1-8"]],["102",["1-2"]],["103",["1-2","3-4","5-6"]],["104",["1-2","3-4"]]]},
+  {name:"현대홈타운 1차", homes:341, dongs:[["101",["1-2","3-4"]],["102",["1-2","3-4"]],["103",["1-2"]],["104",["1-2"]],["105",["1-2","3-4"]]]},
+  {name:"현대홈타운 2차", homes:596, dongs:[["201",["1-2","3-4","5-6"]],["202",["1-2","3-4"]],["203",["1-2","3-4"]],["204",["1-2","3-4","5-6"]],["205",["1-2","3-4"]],["206",["1-2","3-4"]],["207",["1-2","3-4"]]]},
+  {name:"미주 6차", homes:120, dongs:[["1",["1-5"]],["2",["1-5"]],["3",["1-5"]]]}
+];
+const aptNorm = v => String(v||"").replace(/라인|동/g,"").replace(/[~∼]/g,"-").replace(/\s/g,"");
+const dongTxt = d => /^\d/.test(d||"") ? `${d}동` : (d||"");
 const SET = () => Object.assign({}, DEFAULTS, (S.app_settings.main && S.app_settings.main.data) || {});
 
 /* ================= 데이터 ================= */
@@ -804,7 +820,14 @@ function viewPromo(){
     const by = {}; list.forEach(a => { const k=tName(a.trainer_id); by[k]=(by[k]||0)+1; });
     h += `<div class="card"><div class="card-head"><h2>아파트 홍보 · ${Number(mo.slice(5))}월 ${list.length}곳</h2><button class="more" data-act="newApt">+ 다녀옴</button></div>
       <div class="legend">${Object.entries(by).map(([k,v])=>`<span>${esc(k)} <b class="num">${v}</b></span>`).join("")}</div>
-      ${list.length?`<div class="list">${list.map(a=>`<div class="row tap" data-apt="${esc(a.id)}"><div class="time" style="font-size:15px">${dShort(a.date)}</div><div class="grow"><div class="name">${esc(a.complex)} ${esc(a.dong)}동 ${esc(a.line||"")}</div><div class="sub">${esc([tName(a.trainer_id), a.memo].filter(Boolean).join(" · "))}</div></div></div>`).join("")}</div>`:'<div class="emptyline">다녀온 곳만 한 줄씩 기록해요</div>'}</div>`;
+      ${list.length?`<div class="list">${list.map(a=>`<div class="row tap" data-apt="${esc(a.id)}"><div class="time" style="font-size:15px">${dShort(a.date)}</div><div class="grow"><div class="name">${esc(a.complex)} ${esc(dongTxt(a.dong))} ${esc(a.line&&a.line!=="전체"?(/라인/.test(a.line)?a.line:a.line+"라인"):"")}</div><div class="sub">${esc([tName(a.trainer_id), a.memo].filter(Boolean).join(" · "))}</div></div></div>`).join("")}</div>`:'<div class="emptyline">다녀온 곳만 한 줄씩 기록해요</div>'}</div>`;
+    const seen = {}; list.forEach(a => { const k=[a.complex, aptNorm(a.dong), aptNorm(a.line)].join("|"); if (!seen[k] || a.date>seen[k]) seen[k]=a.date; });
+    h += `<div class="card"><div class="card-head"><h2>단지별 현황 · ${Number(mo.slice(5))}월</h2></div>
+      ${APTS.map(c => { const all = c.dongs.flatMap(([d,ls]) => ls.map(l => [d,l])); const done = all.filter(([d,l]) => seen[[c.name,d,l].join("|")]).length;
+        return `<div class="aptc"><div class="aptc-h"><b>${esc(c.name)}</b><span class="sub">${c.homes}세대</span><span class="aptc-n${done===all.length?" full":""}">${done}/${all.length}</span></div>
+          ${c.dongs.map(([d,ls]) => `<div class="aptd"><span class="aptd-l">${esc(dongTxt(d))}</span><div class="aptd-c">${ls.map(l => { const dt = seen[[c.name,d,l].join("|")];
+            return `<button type="button" class="chip${dt?" on":""}" data-aptgo="${esc([c.name,d,l].join("|"))}">${esc(l==="전체"?"단지 전체":l+"라인")}${dt?`<span class="c">${Number(dt.slice(8))}일</span>`:""}</button>`; }).join("")}</div></div>`).join("")}</div>`; }).join("")}
+      <p class="note">라인을 누르면 바로 기록할 수 있어요</p></div>`;
   }
   if (promoSeg==="review"){
     const list = vals("reviews").filter(r=>month(r.date)===mo).sort((a,b)=>b.date.localeCompare(a.date));
@@ -1716,13 +1739,13 @@ function dailyForm(date){
       if (await safe(() => api.save("promo_daily", row), "기록했어요")) closeSheet(); });
   });
 }
-function aptForm(a){
-  const isNew = !a; a = a || {};
-  const complexes = [...new Set(vals("apt_promos").map(x=>x.complex).filter(Boolean))];
+function aptForm(a, pre){
+  const isNew = !a; a = a || Object.assign({}, pre||{});
+  const complexes = [...new Set(APTS.map(c=>c.name).concat(vals("apt_promos").map(x=>x.complex)).filter(Boolean))];
   openSheet(`${head(isNew?"아파트 홍보 기록":"아파트 홍보 수정")}
     <form id="af" class="form"><div class="two"><div class="field"><label for="a_d">날짜</label><input id="a_d" type="date" value="${esc(a.date||todayStr())}"></div><div class="field"><label for="a_tr">담당</label><select id="a_tr">${trainerOptions(a.trainer_id||(me&&me.id), true)}</select></div></div>
-      <div class="field"><label for="a_c">단지</label><input id="a_c" list="a_cl" required maxlength="30" value="${esc(a.complex)}" placeholder="예: 한빛아파트"><datalist id="a_cl">${complexes.map(c=>`<option value="${esc(c)}">`).join("")}</datalist></div>
-      <div class="two"><div class="field"><label for="a_dong">동</label><input id="a_dong" required maxlength="10" inputmode="numeric" value="${esc(a.dong)}" placeholder="101"></div><div class="field"><label for="a_l">라인</label><input id="a_l" maxlength="20" value="${esc(a.line)}" placeholder="1~4라인"></div></div>
+      <div class="field"><label for="a_c">단지</label><input id="a_c" list="a_cl" required maxlength="30" value="${esc(a.complex)}" placeholder="단지 이름"><datalist id="a_cl">${complexes.map(c=>`<option value="${esc(c)}">`).join("")}</datalist></div>
+      <div class="two"><div class="field"><label for="a_dong">동</label><input id="a_dong" required maxlength="10" value="${esc(a.dong)}" placeholder="101"></div><div class="field"><label for="a_l">라인</label><input id="a_l" maxlength="20" value="${esc(a.line)}" placeholder="1-2"></div></div>
       <div class="field"><label for="a_m">메모 (반응 · 특이사항)</label><input id="a_m" maxlength="80" value="${esc(a.memo)}"></div>
       <button class="btn primary block" type="submit">저장</button>${isNew?"":'<button type="button" class="btn danger block" data-act="del">삭제</button>'}</form>`, s => {
     const del = s.querySelector("[data-act=del]"); del && del.addEventListener("click", async () => { if (await safe(() => api.remove("apt_promos", a.id), "삭제했어요")) closeSheet(); });
@@ -2004,6 +2027,7 @@ $("#view").addEventListener("click", async e => {
   if ((x=g("[data-lead]"))){ leadDetail(x.dataset.lead); return; }
   if ((x=g("[data-deal]"))){ dealForm(S.deals[x.dataset.deal]); return; }
   if ((x=g("[data-daily]"))){ dailyForm(x.dataset.daily); return; }
+  if ((x=g("[data-aptgo]"))){ const [complex,dong,line] = x.dataset.aptgo.split("|"); aptForm(null, {complex, dong, line}); return; }
   if ((x=g("[data-apt]"))){ aptForm(S.apt_promos[x.dataset.apt]); return; }
   if ((x=g("[data-review]"))){ reviewForm(S.reviews[x.dataset.review]); return; }
   if ((x=g("[data-task]"))){ taskForm(S.fac_tasks[x.dataset.task]); return; }
