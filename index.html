@@ -1233,7 +1233,10 @@ function facilityView(){
   if (facSeg==="repair"){ const reps = vals("repairs").sort((a,b)=>(a.status==="완료")-(b.status==="완료") || (b.received_on||"").localeCompare(a.received_on||""));
     h += `<div class="card"><div class="card-head"><h2>수리일지</h2><button class="more" data-act="newRepair">+ 고장 접수</button></div>${reps.length?`<div class="list">${reps.map(repairRow).join("")}</div>`:'<div class="emptyline">기록이 없어요</div>'}</div>`; }
   if (facSeg==="supply"){ const ord = ["order","none","ok"]; const ss = vals("supplies").sort((a,b)=>ord.indexOf(supplyState(a).k)-ord.indexOf(supplyState(b).k) || (a.name||"").localeCompare(b.name||"","ko"));
-    h += `<div class="card"><div class="card-head"><h2>소모품 재고</h2><button class="more" data-act="newSupply">+ 품목</button></div><div class="list">${ss.map(supplyRow).join("")}</div></div>`; }
+    const ZO = ["인포","기타용품"], zs = [...new Set(ss.map(x=>x.zone||"기타용품"))].sort((a,b)=>((ZO.indexOf(a)+1)||99)-((ZO.indexOf(b)+1)||99) || a.localeCompare(b,"ko"));
+    if (!ss.length) zs.push("인포");
+    h += zs.map((z,i) => { const zl = ss.filter(x=>(x.zone||"기타용품")===z), no = zl.filter(x=>supplyState(x).k==="order").length;
+      return `<div class="card"><div class="card-head"><h2>${esc(z)} <span class="sub">${zl.length}개${no?` · 발주 ${no}`:""}</span></h2>${i===0?'<button class="more" data-act="newSupply">+ 품목</button>':""}</div><div class="list">${zl.map(supplyRow).join("")}</div></div>`; }).join(""); }
   return h;
 }
 function meetingRow(g){ const a=g.actions||[], d=a.filter(x=>x.done).length;
@@ -1815,6 +1818,7 @@ function supplyForm(x){
   const isNew = !x; x = x || {};
   openSheet(`${head(isNew?"소모품 추가":esc(x.name))}
     <form id="sf" class="form"><div class="two"><div class="field"><label for="s_n">품목</label><input id="s_n" required maxlength="30" value="${esc(x.name)}"></div><div class="field"><label for="s_u">단위</label><input id="s_u" maxlength="10" value="${esc(x.unit)}" placeholder="BOX, 개, 묶음"></div></div>
+      <div class="field"><label for="s_z">구역</label><input id="s_z" list="s_zl" maxlength="20" value="${esc(x.zone||"")}" placeholder="인포"><datalist id="s_zl"><option value="인포"><option value="기타용품"></datalist></div>
       <div class="two"><div class="field"><label for="s_q">현재 수량</label><input class="numin" id="s_q" type="number" min="0" inputmode="numeric" value="${x.qty??""}"></div><div class="field"><label for="s_min">최소 보유량</label><input class="numin" id="s_min" type="number" min="0" inputmode="numeric" value="${x.min_qty??1}"></div></div>
       <div class="three"><div class="field"><label for="s_lo">마지막 발주일</label><input id="s_lo" type="date" value="${esc(x.last_order||"")}"></div><div class="field"><label for="s_v">거래처</label><input id="s_v" maxlength="20" value="${esc(x.vendor)}"></div><div class="field"><label for="s_p">단가(원)</label><input id="s_p" inputmode="numeric" value="${x.price?comma(x.price):""}"></div></div>
       <div class="field"><label for="s_m">비고</label><input id="s_m" maxlength="60" value="${esc(x.memo)}"></div>
@@ -1823,7 +1827,7 @@ function supplyForm(x){
       if (a.dataset.act==="del"){ if (await safe(() => api.remove("supplies", x.id), "삭제했어요")) closeSheet(); }
       if (a.dataset.act==="ordered"){ s.querySelector("#s_lo").value = todayStr(); toast("발주일을 오늘로 넣었어요. 저장을 눌러 주세요"); } });
     s.querySelector("#sf").addEventListener("submit", async e => { e.preventDefault(); const q = s.querySelector("#s_q").value;
-      const row = Object.assign({}, x, { name:s.querySelector("#s_n").value.trim(), unit:s.querySelector("#s_u").value.trim(), qty: q===""?null:Math.max(0,Number(q)), min_qty:Math.max(0,Number(s.querySelector("#s_min").value)||0), last_order:s.querySelector("#s_lo").value||null, vendor:s.querySelector("#s_v").value.trim(), price:numOf(s.querySelector("#s_p").value)||null, memo:s.querySelector("#s_m").value.trim() });
+      const row = Object.assign({}, x, { name:s.querySelector("#s_n").value.trim(), zone:s.querySelector("#s_z").value.trim()||null, unit:s.querySelector("#s_u").value.trim(), qty: q===""?null:Math.max(0,Number(q)), min_qty:Math.max(0,Number(s.querySelector("#s_min").value)||0), last_order:s.querySelector("#s_lo").value||null, vendor:s.querySelector("#s_v").value.trim(), price:numOf(s.querySelector("#s_p").value)||null, memo:s.querySelector("#s_m").value.trim() });
       if (await safe(() => api.save("supplies", row), "저장했어요")) closeSheet(); });
   });
 }
@@ -1961,7 +1965,7 @@ function accountSheet(){
       
       <button class="btn primary block" type="submit">저장</button></form>
     <dl class="kv"><div><dt>이메일</dt><dd>${esc(me?me.email:"-")}</dd></div><div><dt>권한</dt><dd>${isAdmin()?"관리자":"트레이너"}</dd></div></dl>
-    ${isStandalone()?'':installEvt?'<button class="btn ghost block" data-act="install">📲 앱으로 설치하기</button>':''}<button class="btn ghost block" data-act="logout">로그아웃</button>`, s => {
+    ${isStandalone()?'':(installEvt||IS_IOS)?'<button class="btn ghost block" data-act="install">📲 앱으로 설치하기</button>':''}<button class="btn ghost block" data-act="logout">로그아웃</button>`, s => {
     s.addEventListener("click", e => { if (e.target.closest("[data-act='logout']")) logout(); if (e.target.closest("[data-act='install']")) { closeSheet(); doInstall(); } });
     s.querySelector("#acf").addEventListener("submit", async e => { e.preventDefault(); if (!me) return;
       const name = s.querySelector("#ac_n").value.trim(); if (!name){ toast("이름을 입력해 주세요"); return; }
@@ -2095,13 +2099,26 @@ $("#recheck").addEventListener("click", () => enter());
 /* ================= 앱 설치 (PWA) ================= */
 let installEvt = null;
 function isStandalone(){ return (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true; }
-function showInstallBar(){ const b = $("#installBar"); if (b) b.hidden = !(installEvt && !isStandalone() && store.get("sg_install_x") !== "1"); }
+const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform==="MacIntel" && navigator.maxTouchPoints > 1);
+function showInstallBar(){ const b = $("#installBar"); if (b) b.hidden = !((installEvt || IS_IOS) && !isStandalone() && store.get("sg_install_x") !== "1"); }
+function iosGuide(){
+  const ib = $("#installBar"); if (ib) ib.hidden = true;
+  const inApp = /KAKAOTALK|NAVER|Instagram|FBAN|FBAV|Line\//i.test(navigator.userAgent), pad = /iPad/.test(navigator.userAgent) || navigator.platform==="MacIntel";
+  const st = (n,t) => `<div style="display:flex;gap:12px;align-items:flex-start;padding:10px 0"><span style="flex:none;width:28px;height:28px;border-radius:50%;background:var(--ink);color:var(--bg);font-weight:700;display:flex;align-items:center;justify-content:center">${n}</span><div style="line-height:1.55;padding-top:2px">${t}</div></div>`;
+  openSheet(`${head("홈 화면에 추가하기")}
+    ${inApp?`<div class="confirm" style="margin-bottom:6px">지금은 앱 안 브라우저예요. 오른쪽 아래(또는 위) 메뉴에서 <b>사파리로 열기</b>를 누른 뒤 다시 따라 해 주세요.</div>`:""}
+    ${st(1, `사파리 ${pad?"주소창 오른쪽 위":"화면 맨 아래 가운데"}의 <b>공유 버튼</b> <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="M12 3v12M7 8l5-5 5 5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg> 을 눌러요<br><span class="sub">안 보이면 주소창 옆 <b>⋯</b> → 공유</span>`)}
+    ${st(2, `메뉴를 내려서 <b>홈 화면에 추가</b>를 눌러요`)}
+    ${st(3, `오른쪽 위 <b>추가</b>를 누르면 끝이에요`)}
+    <button class="btn primary block" data-close>확인</button>`);
+}
 async function doInstall(){
-  if (!installEvt){ toast('크롬 메뉴(⋮) → "앱 설치"를 눌러 주세요'); return; }
+  if (!installEvt){ if (IS_IOS){ iosGuide(); return; } toast('크롬 메뉴(⋮) → "앱 설치"를 눌러 주세요'); return; }
   installEvt.prompt(); try { const r = await installEvt.userChoice; if (r && r.outcome === "accepted") toast("앱을 설치했어요. 홈 화면을 확인해 주세요"); } catch(e){}
   installEvt = null; showInstallBar();
 }
 window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; showInstallBar(); });
+showInstallBar(); if (IS_IOS){ const t=$("#installGo"); if (t) t.textContent="방법"; }
 window.addEventListener("appinstalled", () => { installEvt = null; showInstallBar(); });
 $("#installGo").addEventListener("click", doInstall);
 $("#installX").addEventListener("click", () => { store.set("sg_install_x","1"); showInstallBar(); toast("나중에 내 계정(오른쪽 위)에서 설치할 수 있어요"); });
